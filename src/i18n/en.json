@@ -1,0 +1,112 @@
+{
+  "app": {
+    "title": "Time Cafe"
+  },
+  "debug": {
+    "title": "Debug",
+    "backendCheck": "Backend check",
+    "checking": "Checking...",
+    "noData": "No data",
+    "backendUp": "Backend is reachable",
+    "backendDown": "Backend is not reachable",
+    "checkAgain": "Check again",
+    "checkingAgain": "Checking..."
+  },
+  "tabs": {
+    "cafes": "Cafes",
+    "bookings": "Bookings"
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "goToRegister": "Create account"
+    },
+    "register": {
+      "title": "Create account",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "phone": "Phone (optional)",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign up",
+      "goToLogin": "Already have an account? Sign in"
+    },
+    "profile": {
+      "title": "Profile",
+      "refresh": "Refresh",
+      "logout": "Log out"
+    }
+  },
+  "cafes": {
+    "listTitle": "Cafes",
+    "detailsTitle": "Cafe",
+    "loading": "Loading cafes...",
+    "empty": "No cafes",
+    "searchTitle": "Search",
+    "filtersTitle": "Filters",
+    "sortTitle": "Sort",
+    "searchPlaceholder": "Search by name/address/description",
+    "city": "City",
+    "country": "Country",
+    "sortBy": "Sort by",
+    "sortOrder": "Order",
+    "sortBy_rating": "Rating",
+    "sortBy_distance": "Distance",
+    "sortBy_createdAt": "Created",
+    "sortBy_reviewsCount": "Reviews",
+    "sortOrder_asc": "Ascending",
+    "sortOrder_desc": "Descending",
+    "reset": "Reset",
+    "apply": "Search",
+    "details": {
+      "address": "Address",
+      "city": "City",
+      "rating": "Rating",
+      "reviews": "Reviews",
+      "apiUrl": "Cafe API URL",
+      "description": "Description",
+      "raw": "Raw data"
+    }
+  },
+  "appointments": {
+    "listTitle": "Bookings",
+    "detailsTitle": "Booking",
+    "loading": "Loading bookings...",
+    "empty": "No bookings",
+    "filtersTitle": "Filters",
+    "status": "Status",
+    "from": "From (ISO)",
+    "to": "To (ISO)",
+    "reset": "Reset",
+    "apply": "Search",
+    "cancel": "Cancel booking",
+    "cancelReason": "Reason (optional)",
+    "cancelConfirm": "Confirm cancel",
+    "close": "Close",
+    "raw": "Raw data",
+    "status_pending": "Pending",
+    "status_confirmed": "Confirmed",
+    "status_cancelled": "Cancelled",
+    "status_completed": "Completed",
+    "createTitle": "New booking",
+    "createCafe": "Cafe",
+    "createDate": "Date (YYYY-MM-DD)",
+    "createTime": "Time (HH:mm)",
+    "createDateTimePreview": "Preview",
+    "createDuration": "Duration (minutes)",
+    "createDurationPreset": "Preset",
+    "createDurationCustom": "Custom",
+    "createPaymentMethod": "Payment method",
+    "createNotes": "Notes (optional)",
+    "createSubmit": "Create booking",
+    "payment_FREE": "Free",
+    "payment_BALANCE": "Balance",
+    "payment_CARD": "Card",
+    "payment_CASH": "Cash",
+    "invalidDateTime": "Invalid date or time"
+  }
+}
+

@@ -3,10 +3,13 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
-  phone?: string;
-  avatar?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  phone?: string | null;
+  avatar?: string | null;
+  balance?: string;
+  createdAt: string;
+  role?: 'USER' | 'SYSTEM_ADMIN' | 'BRAND_ADMIN' | 'CAFE_ADMIN' | 'WORKER';
+  brandId?: string | null;
+  cafeId?: string | null;
 }
 
 export interface Cafe {
