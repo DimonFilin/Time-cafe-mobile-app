@@ -36,3 +36,15 @@ export async function me(): Promise<User> {
   return res.data as User;
 }
 
+export type UpdateMeInput = {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  avatar?: string;
+};
+
+export async function updateMe(input: UpdateMeInput): Promise<User> {
+  const res = await sharedApi.patch('/auth/me', input);
+  return res.data as User;
+}
+

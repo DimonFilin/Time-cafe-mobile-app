@@ -6,6 +6,7 @@ export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   App: NavigatorScreenParams<AppTabsParamList>;
+  Cards: undefined;
   BookingCreate: { cafeId: string; cafeName?: string };
   Debug: undefined;
 };

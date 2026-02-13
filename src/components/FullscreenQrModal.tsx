@@ -40,6 +40,7 @@ export function FullscreenQrModal({ visible, title, value, onClose }: Props) {
 
           <View style={styles.qrWrap}>
             <QRCode value={value} size={280} />
+            {/* Reserved space for app icon/logo (optional) */}
             <View pointerEvents="none" style={styles.centerBadge}>
               <Text style={styles.centerBadgeText}>TC</Text>
             </View>

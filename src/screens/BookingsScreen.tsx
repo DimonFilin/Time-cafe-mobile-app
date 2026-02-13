@@ -3,15 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useLayoutEffect, useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import QRCode from 'react-native-qrcode-svg';
 
 import type { AppointmentStatus } from '@/api/appointments';
 import { getMyAppointments } from '@/api/appointments';
-import { FullscreenQrModal } from '@/components/FullscreenQrModal';
 import { t } from '@/i18n';
 import type { BookingsStackParamList } from '@/navigation/stacks';
-import { useAuthStore } from '@/store/authStore';
-import { buildAppointmentQrPayload } from '@/utils/appointmentQr';
 import { formatDateTime } from '@/utils/dates';
 
 type Props = StackScreenProps<BookingsStackParamList, 'BookingsList'>;
@@ -44,11 +40,7 @@ function getStatusColors(status: AppointmentStatus) {
 }
 
 export function BookingsScreen({ navigation }: Props) {
-  const viewer = useAuthStore((s) => s.user);
   const [modalVisible, setModalVisible] = useState(false);
-  const [qrVisible, setQrVisible] = useState(false);
-  const [qrValue, setQrValue] = useState<string>('');
-  const [qrTitle, setQrTitle] = useState<string>('');
 
   const [draft, setDraft] = useState<Filters>({ statuses: [], from: '', to: '' });
   const [applied, setApplied] = useState<Filters>({ statuses: [] });
@@ -234,31 +226,8 @@ export function BookingsScreen({ navigation }: Props) {
                 {formatDateTime(item.dateTime)} • {item.duration}m
               </Text>
             </Pressable>
-
-            <Pressable
-              onPress={() => {
-                setQrTitle(item.cafeName ?? t('appointments.detailsTitle'));
-                setQrValue(buildAppointmentQrPayload({ appointment: item, viewer }));
-                setQrVisible(true);
-              }}
-              style={({ pressed }) => [styles.qrCard, pressed && styles.pressed]}
-            >
-              <View style={styles.qrPreview}>
-                <QRCode value={buildAppointmentQrPayload({ appointment: item, viewer })} size={120} />
-                <View pointerEvents="none" style={styles.qrCenterBadge}>
-                  <Text style={styles.qrCenterBadgeText}>TC</Text>
-                </View>
-              </View>
-            </Pressable>
           </View>
         )}
-      />
-
-      <FullscreenQrModal
-        visible={qrVisible}
-        title={qrTitle}
-        value={qrValue}
-        onClose={() => setQrVisible(false)}
       />
     </View>
   );
@@ -276,31 +245,6 @@ const styles = StyleSheet.create({
   statusPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: '#111' },
   statusText: { fontSize: 11, fontWeight: '700' },
   itemSub: { fontSize: 12, opacity: 0.7 },
-  qrCard: {
-    marginTop: 10,
-    alignSelf: 'center',
-    width: 140,
-    height: 140,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#eee',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-  },
-  qrPreview: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center' },
-  qrCenterBadge: {
-    position: 'absolute',
-    width: 22,
-    height: 22,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  qrCenterBadgeText: { fontSize: 8, fontWeight: '800', letterSpacing: 0.6 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: '#fff', padding: 16, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
   modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },

@@ -6,6 +6,7 @@ import { AppTabs } from '@/navigation/AppTabs';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuthStore } from '@/store/authStore';
 import { BookingCreateScreen } from '@/screens/BookingCreateScreen';
+import { CardsScreen } from '@/screens/CardsScreen';
 import { DebugScreen } from '@/screens/DebugScreen';
 import { LoginScreen } from '@/screens/LoginScreen';
 import { RegisterScreen } from '@/screens/RegisterScreen';
@@ -39,6 +40,7 @@ export function RootNavigator() {
         component={BookingCreateScreen}
         options={{ title: t('appointments.createTitle') }}
       />
+      <Stack.Screen name="Cards" component={CardsScreen} options={{ title: 'Cards' }} />
       <Stack.Screen name="Debug" component={DebugScreen} options={{ title: t('debug.title') }} />
     </Stack.Navigator>
   );
