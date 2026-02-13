@@ -5,13 +5,13 @@ import { Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'reac
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
-import { me, updateMe, type UpdateMeInput } from '@/api/auth';
-import { getStorageTestFileUrl, uploadToBucket } from '@/api/storage';
+import { getMyAvatarSignedUrl, me, updateMe, uploadMyAvatar, type UpdateMeInput } from '@/api/auth';
 import { clearPersistedSession } from '@/auth/session';
 import { FullscreenImageModal } from '@/components/FullscreenImageModal';
 import { t } from '@/i18n';
 import { useAuthStore } from '@/store/authStore';
 import { getErrorMessage } from '@/utils/errors';
+import { resolveFileUrl } from '@/utils/files';
 
 export function ProfileScreen() {
   const navigation = useNavigation<any>();
@@ -39,6 +39,8 @@ export function ProfileScreen() {
   const [avatar, setAvatar] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
+  const [avatarSignedUrl, setAvatarSignedUrl] = useState<string | null>(null);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -48,6 +50,30 @@ export function ProfileScreen() {
     setPhone((user.phone ?? '') as string);
     setAvatar((user.avatar ?? '') as string);
   }, [user?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setAvatarLoadFailed(false);
+    setAvatarSignedUrl(null);
+
+    if (!user?.avatar) return;
+
+    (async () => {
+      try {
+        const res = await getMyAvatarSignedUrl();
+        if (cancelled) return;
+        setAvatarSignedUrl(res.url);
+      } catch {
+        // Fallback handled via resolveFileUrl / raw avatar value
+        if (cancelled) return;
+        setAvatarSignedUrl(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.avatar]);
 
   const updateMutation = useMutation({
     mutationFn: (input: UpdateMeInput) => updateMe(input),
@@ -80,35 +106,38 @@ export function ProfileScreen() {
 
   async function pickAndUploadAvatar() {
     if (!user?.id) return;
-    setAvatarUploadError(null);
+    setAvatarUploadError('Opening image picker…');
 
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       setAvatarUploadError('Media library permission is required.');
       return;
     }
+    setAvatarUploadError(null);
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
     });
 
-    if (result.canceled) return;
+    if (result.canceled) {
+      setAvatarUploadError(null);
+      return;
+    }
     const asset = result.assets?.[0];
     if (!asset?.uri) return;
 
     const fileName = (asset.fileName ?? `avatar-${user.id}-${Date.now()}.jpg`).replace(/\s+/g, '-');
     const mimeType = asset.mimeType ?? 'image/jpeg';
-    const path = `avatars/${user.id}/${fileName}`;
 
     try {
       setAvatarUploading(true);
-      const uploaded = await uploadToBucket('public', { path, uri: asset.uri, mimeType, fileName });
-      const url = uploaded.url || (await getStorageTestFileUrl({ bucket: 'public', path }));
-      if (!url) throw new Error('Failed to get avatar URL.');
-      setAvatar(url);
+      const updated = await uploadMyAvatar({ uri: asset.uri, mimeType, fileName });
+      setUser(updated);
+      queryClient.setQueryData(['me'], updated);
+      setAvatar(String(updated.avatar ?? ''));
     } catch (e) {
       setAvatarUploadError(getErrorMessage(e));
     } finally {
@@ -169,7 +198,24 @@ export function ProfileScreen() {
           style={({ pressed }) => [styles.avatarPressable, pressed && !!user?.avatar && styles.pressed]}
         >
           {user?.avatar ? (
-            <Image source={{ uri: String(user.avatar) }} style={styles.avatarImg} />
+            avatarLoadFailed ? (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarPlaceholderText}>
+                  {String(user?.firstName?.[0] ?? 'U').toUpperCase()}
+                </Text>
+              </View>
+            ) : (
+              <Image
+                source={{
+                  uri:
+                    avatarSignedUrl ??
+                    resolveFileUrl(String(user.avatar)) ??
+                    String(user.avatar),
+                }}
+                style={styles.avatarImg}
+                onError={() => setAvatarLoadFailed(true)}
+              />
+            )
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Text style={styles.avatarPlaceholderText}>
@@ -221,11 +267,15 @@ export function ProfileScreen() {
       </Pressable>
 
       <Modal visible={editVisible} transparent animationType="fade" onRequestClose={() => setEditVisible(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setEditVisible(false)}>
-          <Pressable style={styles.modalCard} onPress={() => null}>
+        <View style={styles.modalOverlay} pointerEvents="box-none">
+          <Pressable style={styles.modalBackdrop} onPress={() => setEditVisible(false)} />
+          <View style={styles.modalCard} pointerEvents="auto">
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit profile</Text>
-              <Pressable onPress={() => setEditVisible(false)} style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}>
+              <Pressable
+                onPress={() => setEditVisible(false)}
+                style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}
+              >
                 <Ionicons name="close-outline" size={18} color="#111" />
               </Pressable>
             </View>
@@ -272,14 +322,18 @@ export function ProfileScreen() {
             >
               <Text style={styles.primaryBtnText}>{updateMutation.isPending ? 'Saving…' : 'Save'}</Text>
             </Pressable>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
 
       {user?.avatar ? (
         <FullscreenImageModal
           visible={avatarFullscreenVisible}
-          uri={String(user.avatar)}
+          uri={
+            avatarSignedUrl ??
+            resolveFileUrl(String(user.avatar)) ??
+            String(user.avatar)
+          }
           onClose={() => setAvatarFullscreenVisible(false)}
         />
       ) : null}
@@ -364,15 +418,22 @@ const styles = StyleSheet.create({
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     padding: 16,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    zIndex: 0,
+    elevation: 0,
   },
   modalCard: {
     width: '100%',
     borderRadius: 16,
     backgroundColor: '#fff',
     padding: 12,
+    zIndex: 2,
+    elevation: 8,
   },
   modalHeader: {
     flexDirection: 'row',

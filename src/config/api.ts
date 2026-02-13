@@ -7,20 +7,33 @@ import { useAuthStore } from '@/store/authStore';
 export const sharedApi = axios.create({
   baseURL: SHARED_API_URL,
   timeout: 8000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 export const cafeApi = axios.create({
   baseURL: CAFE_API_URL,
   timeout: 8000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
+function ensureJsonContentType(config: InternalAxiosRequestConfig) {
+  // For multipart/FormData requests axios must set the boundary itself.
+  const anyData = (config as any).data;
+  const isFormData = typeof FormData !== 'undefined' && anyData instanceof FormData;
+  if (isFormData) {
+    if (config.headers && 'Content-Type' in config.headers) {
+      delete (config.headers as any)['Content-Type'];
+    }
+    return config;
+  }
+
+  config.headers = config.headers ?? {};
+  if (!(config.headers as any)['Content-Type']) {
+    (config.headers as any)['Content-Type'] = 'application/json';
+  }
+  return config;
+}
+
 sharedApi.interceptors.request.use((config) => {
+  config = ensureJsonContentType(config);
   const accessToken = useAuthStore.getState().accessToken;
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
@@ -29,6 +42,7 @@ sharedApi.interceptors.request.use((config) => {
 });
 
 cafeApi.interceptors.request.use((config) => {
+  config = ensureJsonContentType(config);
   const accessToken = useAuthStore.getState().accessToken;
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
