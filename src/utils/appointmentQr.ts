@@ -11,6 +11,8 @@ export function buildAppointmentQrPayload(input: { appointment: Appointment; vie
     t: 'a', // type: appointment
     a: String(appointment.id),
     u: viewer?.id ? String(viewer.id) : null,
+    c: String(appointment.cafeId),
+    n: appointment.cafeName ? String(appointment.cafeName) : null,
   });
 }
 
