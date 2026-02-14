@@ -4,27 +4,13 @@ import type { User } from '@/types';
 export function buildAppointmentQrPayload(input: { appointment: Appointment; viewer: User | null }) {
   const { appointment, viewer } = input;
 
-  return JSON.stringify(
-    {
-      v: 1,
-      type: 'appointment',
-      appointment: {
-        id: appointment.id,
-        cafeId: appointment.cafeId,
-        cafeName: appointment.cafeName ?? null,
-        dateTime: appointment.dateTime,
-        duration: appointment.duration,
-        status: appointment.status,
-      },
-      viewer: viewer
-        ? {
-            id: viewer.id,
-            email: viewer.email,
-          }
-        : null,
-    },
-    null,
-    0
-  );
+  // Keep payload minimal to make QR less dense (bigger center logo, better scan reliability).
+  // Short keys are intentional.
+  return JSON.stringify({
+    v: 1, // version
+    t: 'a', // type: appointment
+    a: String(appointment.id),
+    u: viewer?.id ? String(viewer.id) : null,
+  });
 }
 

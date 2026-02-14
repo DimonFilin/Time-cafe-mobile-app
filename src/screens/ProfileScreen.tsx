@@ -10,6 +10,7 @@ import { clearPersistedSession } from '@/auth/session';
 import { FullscreenImageModal } from '@/components/FullscreenImageModal';
 import { t } from '@/i18n';
 import { useAuthStore } from '@/store/authStore';
+import { formatDateTime } from '@/utils/dates';
 import { getErrorMessage } from '@/utils/errors';
 import { resolveFileUrl } from '@/utils/files';
 
@@ -36,11 +37,11 @@ export function ProfileScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
-  const [avatar, setAvatar] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
   const [avatarSignedUrl, setAvatarSignedUrl] = useState<string | null>(null);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  const [avatarChanged, setAvatarChanged] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -48,7 +49,6 @@ export function ProfileScreen() {
     setFirstName(user.firstName ?? '');
     setLastName(user.lastName ?? '');
     setPhone((user.phone ?? '') as string);
-    setAvatar((user.avatar ?? '') as string);
   }, [user?.id]);
 
   useEffect(() => {
@@ -89,9 +89,8 @@ export function ProfileScreen() {
     if (firstName.trim()) p.firstName = firstName.trim();
     if (lastName.trim()) p.lastName = lastName.trim();
     if (phone.trim()) p.phone = phone.trim();
-    if (avatar.trim()) p.avatar = avatar.trim();
     return p;
-  }, [firstName, lastName, phone, avatar]);
+  }, [firstName, lastName, phone]);
 
   const isDirty = useMemo(() => {
     if (!user) return false;
@@ -99,10 +98,59 @@ export function ProfileScreen() {
     return (
       a(firstName) !== a(user.firstName) ||
       a(lastName) !== a(user.lastName) ||
-      a(phone) !== a(user.phone as any) ||
-      a(avatar) !== a(user.avatar as any)
+      a(phone) !== a(user.phone as any)
     );
-  }, [user?.id, firstName, lastName, phone, avatar]);
+  }, [user?.id, firstName, lastName, phone]);
+
+  function digitsOnly(v: string) {
+    return v.replace(/\D+/g, '');
+  }
+
+  function formatByPhone(v: string) {
+    const digits = digitsOnly(v);
+    const tail = digits.startsWith('375') ? digits.slice(3) : digits;
+    const d = tail.slice(0, 9);
+
+    const parts: string[] = ['+375'];
+    const p1 = d.slice(0, 2);
+    const p2 = d.slice(2, 5);
+    const p3 = d.slice(5, 7);
+    const p4 = d.slice(7, 9);
+    if (p1) parts.push(p1);
+    if (p2) parts.push(p2);
+    if (p3) parts.push(p3);
+    if (p4) parts.push(p4);
+    return parts.join('-');
+  }
+
+  const phoneFormatted = useMemo(() => formatByPhone(phone), [phone]);
+  const phoneDigits = useMemo(() => digitsOnly(phoneFormatted), [phoneFormatted]);
+  const phoneValid = useMemo(() => {
+    const t = phone.trim();
+    if (!t) return true;
+    return phoneDigits.startsWith('375') && phoneDigits.length === 12;
+  }, [phone, phoneDigits]);
+
+  const nameTooLong = firstName.trim().length > 20 || lastName.trim().length > 20;
+  const canSave = (isDirty || avatarChanged) && !avatarUploading && !updateMutation.isPending && phoneValid && !nameTooLong;
+
+  function handleSave() {
+    if (!canSave) return;
+    if (isDirty) {
+      updateMutation.mutate(payload);
+      return;
+    }
+    // Avatar upload already updates profile on backend.
+    setAvatarChanged(false);
+    setEditVisible(false);
+  }
+
+  function getAvatarUri() {
+    const raw = user?.avatar ? String(user.avatar) : '';
+    const candidate = avatarSignedUrl ?? resolveFileUrl(raw) ?? raw;
+    if (!/^https?:\/\//i.test(candidate)) return null;
+    return candidate;
+  }
 
   async function pickAndUploadAvatar() {
     if (!user?.id) return;
@@ -137,7 +185,7 @@ export function ProfileScreen() {
       const updated = await uploadMyAvatar({ uri: asset.uri, mimeType, fileName });
       setUser(updated);
       queryClient.setQueryData(['me'], updated);
-      setAvatar(String(updated.avatar ?? ''));
+      setAvatarChanged(true);
     } catch (e) {
       setAvatarUploadError(getErrorMessage(e));
     } finally {
@@ -158,7 +206,7 @@ export function ProfileScreen() {
               setFirstName(user.firstName ?? '');
               setLastName(user.lastName ?? '');
               setPhone((user.phone ?? '') as string);
-              setAvatar((user.avatar ?? '') as string);
+              setAvatarChanged(false);
               setEditVisible(true);
             }}
             style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}
@@ -197,7 +245,7 @@ export function ProfileScreen() {
           onPress={() => setAvatarFullscreenVisible(true)}
           style={({ pressed }) => [styles.avatarPressable, pressed && !!user?.avatar && styles.pressed]}
         >
-          {user?.avatar ? (
+          {user?.avatar && getAvatarUri() ? (
             avatarLoadFailed ? (
               <View style={styles.avatarPlaceholder}>
                 <Text style={styles.avatarPlaceholderText}>
@@ -207,10 +255,7 @@ export function ProfileScreen() {
             ) : (
               <Image
                 source={{
-                  uri:
-                    avatarSignedUrl ??
-                    resolveFileUrl(String(user.avatar)) ??
-                    String(user.avatar),
+                  uri: getAvatarUri() as string,
                 }}
                 style={styles.avatarImg}
                 onError={() => setAvatarLoadFailed(true)}
@@ -252,10 +297,7 @@ export function ProfileScreen() {
           <Text style={styles.k}>balance</Text>: {user?.balance ?? '—'}
         </Text>
         <Text style={styles.row}>
-          <Text style={styles.k}>role</Text>: {user?.role ?? '—'}
-        </Text>
-        <Text style={styles.row}>
-          <Text style={styles.k}>createdAt</Text>: {user?.createdAt ?? '—'}
+          <Text style={styles.k}>createdAt</Text>: {formatDateTime(user?.createdAt as any, 'PPpp')}
         </Text>
       </View>
 
@@ -264,6 +306,14 @@ export function ProfileScreen() {
         style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
       >
         <Text style={styles.secondaryBtnText}>Cards</Text>
+      </Pressable>
+
+      
+      <Pressable
+        onPress={() => navigation.navigate('Settings')}
+        style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
+      >
+        <Text style={styles.secondaryBtnText}>Settings</Text>
       </Pressable>
 
       <Modal visible={editVisible} transparent animationType="fade" onRequestClose={() => setEditVisible(false)}>
@@ -280,21 +330,24 @@ export function ProfileScreen() {
               </Pressable>
             </View>
 
-            <Text style={styles.label}>Email</Text>
-            <TextInput value={user?.email ?? ''} editable={false} style={[styles.input, styles.inputDisabled]} />
-            <Text style={styles.hint}>Email is read-only.</Text>
-
             <Text style={[styles.label, { marginTop: 10 }]}>First name</Text>
-            <TextInput value={firstName} onChangeText={setFirstName} style={styles.input} />
+            <TextInput value={firstName} onChangeText={setFirstName} maxLength={20} style={styles.input} />
+            {firstName.trim().length > 20 ? <Text style={styles.error}>Max 20 characters</Text> : null}
 
             <Text style={[styles.label, { marginTop: 10 }]}>Last name</Text>
-            <TextInput value={lastName} onChangeText={setLastName} style={styles.input} />
+            <TextInput value={lastName} onChangeText={setLastName} maxLength={20} style={styles.input} />
+            {lastName.trim().length > 20 ? <Text style={styles.error}>Max 20 characters</Text> : null}
 
             <Text style={[styles.label, { marginTop: 10 }]}>Phone</Text>
-            <TextInput value={phone} onChangeText={setPhone} style={styles.input} />
-
-            <Text style={[styles.label, { marginTop: 10 }]}>Avatar</Text>
-            <TextInput value={avatar} onChangeText={setAvatar} autoCapitalize="none" style={styles.input} />
+            <TextInput
+              value={phoneFormatted}
+              onChangeText={(v) => setPhone(formatByPhone(v))}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+              placeholder="+375-29-333-33-33"
+              style={styles.input}
+            />
+            {!phoneValid ? <Text style={styles.error}>Phone must match +375-XX-XXX-XX-XX</Text> : null}
             <Pressable
               disabled={avatarUploading}
               onPress={() => void pickAndUploadAvatar()}
@@ -308,15 +361,16 @@ export function ProfileScreen() {
               <Text style={styles.secondaryBtnText}>{avatarUploading ? 'Uploading…' : 'Upload avatar'}</Text>
             </Pressable>
             {avatarUploadError ? <Text style={styles.error}>{avatarUploadError}</Text> : null}
+            {avatarChanged ? <Text style={styles.hint}>Avatar updated. Tap Save to close.</Text> : null}
 
             {updateMutation.error ? <Text style={styles.error}>{getErrorMessage(updateMutation.error)}</Text> : null}
 
             <Pressable
-              disabled={!isDirty || updateMutation.isPending || avatarUploading}
-              onPress={() => updateMutation.mutate(payload)}
+              disabled={!canSave}
+              onPress={handleSave}
               style={({ pressed }) => [
                 styles.primaryBtn,
-                (!isDirty || updateMutation.isPending || avatarUploading) && styles.disabled,
+                !canSave && styles.disabled,
                 pressed && !updateMutation.isPending && !avatarUploading && styles.pressed,
               ]}
             >
@@ -329,11 +383,7 @@ export function ProfileScreen() {
       {user?.avatar ? (
         <FullscreenImageModal
           visible={avatarFullscreenVisible}
-          uri={
-            avatarSignedUrl ??
-            resolveFileUrl(String(user.avatar)) ??
-            String(user.avatar)
-          }
+          uri={getAvatarUri() ?? ''}
           onClose={() => setAvatarFullscreenVisible(false)}
         />
       ) : null}

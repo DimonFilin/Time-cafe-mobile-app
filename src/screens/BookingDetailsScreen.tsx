@@ -1,7 +1,7 @@
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { cancelAppointment, getAppointmentById } from '@/api/appointments';
@@ -135,7 +135,7 @@ export function BookingDetailsScreen({ route }: Props) {
             <View style={styles.qrPreview}>
               <QRCode value={qrValue} size={140} />
               <View pointerEvents="none" style={styles.qrCenterBadge}>
-                <Text style={styles.qrCenterBadgeText}>TC</Text>
+                <Image source={require('../../assets/favicon.png')} style={styles.qrCenterLogo} />
               </View>
             </View>
           </Pressable>
@@ -251,8 +251,8 @@ const styles = StyleSheet.create({
   qrPreview: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center' },
   qrCenterBadge: {
     position: 'absolute',
-    width: 28,
-    height: 28,
+    width: 34,
+    height: 34,
     borderRadius: 10,
     backgroundColor: '#fff',
     alignItems: 'center',
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eee',
   },
-  qrCenterBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  qrCenterLogo: { width: 24, height: 24, borderRadius: 8 },
   pressed: { opacity: 0.85 },
   disabled: { opacity: 0.6 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center', padding: 16 },

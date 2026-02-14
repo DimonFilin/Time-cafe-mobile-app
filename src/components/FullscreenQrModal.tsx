@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 type Props = {
@@ -42,7 +42,7 @@ export function FullscreenQrModal({ visible, title, value, onClose }: Props) {
             <QRCode value={value} size={280} />
             {/* Reserved space for app icon/logo (optional) */}
             <View pointerEvents="none" style={styles.centerBadge}>
-              <Text style={styles.centerBadgeText}>TC</Text>
+              <Image source={require('../../assets/favicon.png')} style={styles.centerLogo} />
             </View>
           </View>
 
@@ -83,8 +83,8 @@ const styles = StyleSheet.create({
   },
   centerBadge: {
     position: 'absolute',
-    width: 40,
-    height: 40,
+    width: 56,
+    height: 56,
     borderRadius: 12,
     backgroundColor: '#fff',
     alignItems: 'center',
@@ -92,11 +92,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eee',
   },
-  centerBadgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
+  centerLogo: { width: 40, height: 40, borderRadius: 12 },
   hint: {
     marginTop: 12,
     fontSize: 12,

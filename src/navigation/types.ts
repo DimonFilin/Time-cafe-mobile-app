@@ -9,5 +9,6 @@ export type RootStackParamList = {
   Cards: undefined;
   BookingCreate: { cafeId: string; cafeName?: string };
   Debug: undefined;
+  Settings: undefined;
 };
 

@@ -10,6 +10,7 @@ import { CardsScreen } from '@/screens/CardsScreen';
 import { DebugScreen } from '@/screens/DebugScreen';
 import { LoginScreen } from '@/screens/LoginScreen';
 import { RegisterScreen } from '@/screens/RegisterScreen';
+import { SettingsScreen } from '@/screens/SettingsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -41,6 +42,7 @@ export function RootNavigator() {
         options={{ title: t('appointments.createTitle') }}
       />
       <Stack.Screen name="Cards" component={CardsScreen} options={{ title: 'Cards' }} />
+      <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
       <Stack.Screen name="Debug" component={DebugScreen} options={{ title: t('debug.title') }} />
     </Stack.Navigator>
   );

@@ -9,7 +9,9 @@ import { BookingDetailsScreen } from '@/screens/BookingDetailsScreen';
 import { BookingsScreen } from '@/screens/BookingsScreen';
 import { CafeDetailsScreen } from '@/screens/CafeDetailsScreen';
 import { CafesScreen } from '@/screens/CafesScreen';
+import { CafeReviewsScreen } from '@/screens/CafeReviewsScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
+import { ReviewCreateScreen } from '@/screens/ReviewCreateScreen';
 
 export type AppTabsParamList = {
   Cafes: NavigatorScreenParams<CafesStackParamList>;
@@ -29,6 +31,16 @@ function CafesStackNavigator() {
         name="CafeDetails"
         component={CafeDetailsScreen}
         options={({ route }) => ({ title: route.params.title ?? t('cafes.detailsTitle') })}
+      />
+      <CafesStack.Screen
+        name="CafeReviews"
+        component={CafeReviewsScreen}
+        options={({ route }) => ({ title: route.params.cafeName ?? t('cafes.reviews.title') })}
+      />
+      <CafesStack.Screen
+        name="ReviewCreate"
+        component={ReviewCreateScreen}
+        options={{ title: t('cafes.reviews.write') }}
       />
     </CafesStack.Navigator>
   );

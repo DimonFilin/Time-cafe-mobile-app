@@ -1,12 +1,16 @@
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { useLayoutEffect, useMemo, useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { getCafes, type CafesSortBy, type CafesSortOrder } from '@/api/cafes';
+import { getBrandLogoSignedUrl } from '@/api/brands';
+import { StarRating } from '@/components/StarRating';
 import { t } from '@/i18n';
 import type { CafesStackParamList } from '@/navigation/stacks';
+import { getStableColorFromId } from '@/utils/colors';
+import { resolveFileUrl } from '@/utils/files';
 
 type Props = StackScreenProps<CafesStackParamList, 'CafesList'>;
 
@@ -20,6 +24,59 @@ type CafesQueryParams = {
 
 const SORT_BY_OPTIONS: CafesSortBy[] = ['rating', 'distance', 'createdAt', 'reviewsCount'];
 const SORT_ORDER_OPTIONS: CafesSortOrder[] = ['desc', 'asc'];
+
+function getInitial(name?: string | null) {
+  const raw = String(name || '').trim();
+  return (raw[0] || 'C').toUpperCase();
+}
+
+function CafeThumb(props: {
+  brandId?: string;
+  fallbackUri?: string | null;
+  title?: string | null;
+  color: string;
+}) {
+  const { brandId, fallbackUri, title, color } = props;
+  const [failed, setFailed] = useState(false);
+
+  const logoQuery = useQuery({
+    queryKey: ['brand', brandId, 'logo-url'],
+    queryFn: () => getBrandLogoSignedUrl(String(brandId)),
+    enabled: !!brandId,
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+    refetchOnMount: false,
+  });
+
+  const uri =
+    (logoQuery.data?.url ? resolveFileUrl(logoQuery.data.url) ?? logoQuery.data.url : null) ||
+    (fallbackUri ? resolveFileUrl(fallbackUri) ?? fallbackUri : null);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [uri]);
+
+  const showImage = !!uri && !failed;
+
+  return (
+    <View style={[styles.thumb, { backgroundColor: color }, styles.thumbLetterWrap]}>
+      <Text style={styles.thumbLetter}>{getInitial(title)}</Text>
+      {showImage ? (
+        <Image
+          source={{ uri }}
+          style={styles.thumbImg}
+          onError={() => {
+            if (__DEV__) {
+              // eslint-disable-next-line no-console
+              console.log('[CafeThumb] image failed', { brandId, uri });
+            }
+            setFailed(true);
+          }}
+        />
+      ) : null}
+    </View>
+  );
+}
 
 export function CafesScreen({ navigation }: Props) {
   const [modalVisible, setModalVisible] = useState(false);
@@ -201,12 +258,49 @@ export function CafesScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('CafeDetails', { id: item.id, title: item.name })}
             style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
           >
-            <Text style={styles.itemTitle}>{item.name}</Text>
-            <Text style={styles.itemSub}>
-              {item.address}
-              {item.city ? ` • ${item.city}` : ''}
-            </Text>
-            {typeof item.rating === 'number' ? <Text style={styles.itemMeta}>rating: {item.rating}</Text> : null}
+            {(() => {
+              const stripeColor = getStableColorFromId(item.brandId || item.id);
+              return (
+                <>
+                  <View style={[styles.stripe, { backgroundColor: stripeColor }]} />
+            <View style={styles.itemBody}>
+              <View style={styles.itemTopRow}>
+                <CafeThumb
+                  brandId={item.brandId}
+                  fallbackUri={item.photos?.[0] ?? null}
+                  title={item.name}
+                  color={stripeColor}
+                />
+
+                <View style={styles.itemMain}>
+                  <Text style={styles.itemTitle} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text style={styles.itemSub} numberOfLines={2}>
+                    {item.address}
+                    {item.city ? ` • ${item.city}` : ''}
+                  </Text>
+                  {item.brandName ? (
+                    <Text style={styles.itemBrand} numberOfLines={1}>
+                      {item.brandName}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+
+              <View style={styles.itemBottomRow}>
+                <View style={styles.ratingRow}>
+                  <StarRating value={Number(item.rating ?? 0)} />
+                  <Text style={styles.itemMeta}>
+                    {typeof item.rating === 'number' ? item.rating.toFixed(1) : '—'}
+                    {typeof item.reviewsCount === 'number' ? ` (${item.reviewsCount})` : ''}
+                  </Text>
+                </View>
+              </View>
+            </View>
+                </>
+              );
+            })()}
           </Pressable>
         )}
       />
@@ -219,11 +313,36 @@ const styles = StyleSheet.create({
   topText: { padding: 12 },
   headerActions: { flexDirection: 'row', gap: 6, paddingRight: 8 },
   headerIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  item: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  item: { flexDirection: 'row', gap: 12, padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
   itemPressed: { opacity: 0.8 },
+  stripe: { width: 4, borderRadius: 999 },
+  itemBody: { flex: 1, gap: 10 },
+  itemTopRow: { flexDirection: 'row', gap: 10 },
+  itemMain: { flex: 1 },
+  thumb: { width: 54, height: 54, borderRadius: 14, backgroundColor: '#eee' },
+  thumbImg: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    borderRadius: 14,
+    backgroundColor: 'transparent',
+  },
+  thumbFallback: { backgroundColor: '#f3f4f6' },
+  thumbLetterWrap: { alignItems: 'center', justifyContent: 'center' },
+  thumbLetter: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 22,
+    includeFontPadding: false,
+  },
   itemTitle: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
   itemSub: { fontSize: 12, opacity: 0.7 },
-  itemMeta: { fontSize: 12, opacity: 0.6, marginTop: 6 },
+  itemBrand: { fontSize: 12, fontWeight: '700', marginTop: 6 },
+  itemBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  itemMeta: { fontSize: 12, opacity: 0.7 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: '#fff', padding: 16, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
   modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },

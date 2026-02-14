@@ -69,6 +69,16 @@
       "apiUrl": "Cafe API URL",
       "description": "Description",
       "raw": "Raw data"
+    },
+    "reviews": {
+      "title": "Reviews",
+      "open": "See all reviews",
+      "write": "Write a review",
+      "empty": "No reviews yet",
+      "minRating": "Min rating",
+      "verifiedOnly": "Verified only",
+      "submit": "Submit review",
+      "comment": "Comment (optional)"
     }
   },
   "appointments": {
@@ -100,6 +110,10 @@
     "createDurationPreset": "Preset",
     "createDurationCustom": "Custom",
     "createPaymentMethod": "Payment method",
+    "createCard": "Card",
+    "selectCard": "Select card",
+    "noCards": "No cards. Add one first.",
+    "manageCards": "Manage cards",
     "createNotes": "Notes (optional)",
     "createSubmit": "Create booking",
     "payment_FREE": "Free",
