@@ -3,22 +3,18 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { getCafeById, getCafePhotoUrls } from '@/api/cafes';
-import { getBrandBannerSignedUrl, getBrandById, getBrandLogoSignedUrl } from '@/api/brands';
+import { getCafeById } from '@/api/cafes';
 import { getReviews } from '@/api/reviews';
 import { StarRating } from '@/components/StarRating';
 import { t } from '@/i18n';
 import { navigate } from '@/navigation/navigationRef';
 import type { CafesStackParamList } from '@/navigation/stacks';
-import { getStableColorFromId } from '@/utils/colors';
 import { formatDateTime } from '@/utils/dates';
-import { resolveFileUrl } from '@/utils/files';
 
 type Props = StackScreenProps<CafesStackParamList, 'CafeDetails'>;
 
-export function CafeDetailsScreen({ route }: Props) {
+export function CafeDetailsScreen({ route, navigation }: Props) {
   const { id } = route.params;
-  const [showRaw, setShowRaw] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
   const [bannerFailed, setBannerFailed] = useState(false);
   const [photosLoaded, setPhotosLoaded] = useState(false);
@@ -36,48 +32,6 @@ export function CafeDetailsScreen({ route }: Props) {
     return cafe.rating.toFixed(1);
   }, [cafe?.rating]);
 
-  const brandId = cafe?.brandId;
-  const cafeColor = useMemo(
-    () => getStableColorFromId(String(brandId || cafe?.id || id)),
-    [brandId, cafe?.id, id]
-  );
-
-  const brandQuery = useQuery({
-    queryKey: ['brand', brandId],
-    queryFn: () => getBrandById(String(brandId)),
-    enabled: !!brandId,
-    retry: false,
-    staleTime: 10 * 60 * 1000,
-    refetchOnMount: false,
-  });
-
-  const logoUrlQuery = useQuery({
-    queryKey: ['brand', brandId, 'logo-url'],
-    queryFn: () => getBrandLogoSignedUrl(String(brandId)),
-    enabled: !!brandId,
-    retry: false,
-    staleTime: 10 * 60 * 1000,
-    refetchOnMount: false,
-  });
-
-  const bannerUrlQuery = useQuery({
-    queryKey: ['brand', brandId, 'banner-url'],
-    queryFn: () => getBrandBannerSignedUrl(String(brandId)),
-    enabled: !!brandId,
-    retry: false,
-    staleTime: 10 * 60 * 1000,
-    refetchOnMount: false,
-  });
-
-  const photosQuery = useQuery({
-    queryKey: ['cafe', id, 'photo-urls'],
-    queryFn: () => getCafePhotoUrls(id),
-    enabled: !!cafe?.id,
-    retry: false,
-    staleTime: 5 * 60 * 1000,
-    refetchOnMount: false,
-  });
-
   const reviewsPreviewQuery = useQuery({
     queryKey: ['reviews', { cafeId: id, limit: 3 }],
     queryFn: () => getReviews({ cafeId: id, page: 1, limit: 3 }),
@@ -87,38 +41,42 @@ export function CafeDetailsScreen({ route }: Props) {
     refetchOnMount: false,
   });
 
+  const logoUrl = cafe?.presentation.assets.logoUrl;
+  const bannerUrl = cafe?.presentation.assets.bannerUrl;
+  const photoUrls = cafe?.presentation.assets.photoUrls || [];
+
   useEffect(() => {
     setLogoFailed(false);
-  }, [logoUrlQuery.data?.url]);
+  }, [logoUrl]);
 
   useEffect(() => {
     setBannerFailed(false);
-  }, [bannerUrlQuery.data?.url]);
+  }, [bannerUrl]);
 
   useEffect(() => {
     setPhotosLoaded(false);
-  }, [id, photosQuery.data?.urls?.length]);
+  }, [id, photoUrls.length]);
 
   const theme = useMemo(() => {
-    const b = brandQuery.data;
+    const presentationTheme = cafe?.presentation.theme;
     return {
-      // Keep primary color consistent with list stripe.
-      primary: cafeColor,
-      accent: b?.accentColor || cafeColor,
-      bg: b?.backgroundColor || '#fff',
-      text: b?.textColor || '#111',
+      primary: presentationTheme?.primary || '#111',
+      accent: presentationTheme?.accent || presentationTheme?.primary || '#111',
+      bg: presentationTheme?.background || '#fff',
+      text: presentationTheme?.text || '#111',
       muted: '#6B7280',
       border: '#E5E7EB',
       card: '#F5F5F5',
+      fontFamily: presentationTheme?.fontFamily,
     };
-  }, [brandQuery.data?.id, cafeColor]);
+  }, [cafe?.presentation.theme]);
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.bg }]} contentContainerStyle={styles.content}>
-      {bannerUrlQuery.data?.url && !bannerFailed ? (
+      {bannerUrl && !bannerFailed ? (
         <View style={styles.bannerWrap}>
           <Image
-            source={{ uri: resolveFileUrl(bannerUrlQuery.data.url) ?? bannerUrlQuery.data.url }}
+            source={{ uri: bannerUrl }}
             style={styles.bannerImg}
             onError={() => setBannerFailed(true)}
           />
@@ -132,9 +90,9 @@ export function CafeDetailsScreen({ route }: Props) {
       <View style={styles.headerCard}>
         <View style={styles.logoRow}>
           <View style={[styles.logoCircle, { borderColor: theme.bg }]}>
-            {logoUrlQuery.data?.url && !logoFailed ? (
+            {logoUrl && !logoFailed ? (
               <Image
-                source={{ uri: resolveFileUrl(logoUrlQuery.data.url) ?? logoUrlQuery.data.url }}
+                source={{ uri: logoUrl }}
                 style={styles.logoImg}
                 onError={() => setLogoFailed(true)}
               />
@@ -148,7 +106,15 @@ export function CafeDetailsScreen({ route }: Props) {
           </View>
 
           <View style={styles.titleCol}>
-            <Text style={[styles.title, { color: theme.text }]}>{cafe?.name ?? t('cafes.detailsTitle')}</Text>
+            <Text
+              style={[
+                styles.title,
+                { color: theme.text },
+                theme.fontFamily ? { fontFamily: theme.fontFamily } : null,
+              ]}
+            >
+              {cafe?.name ?? t('cafes.detailsTitle')}
+            </Text>
             <Text style={[styles.sub, { color: theme.muted }]}>
               {cafe?.city || '—'}
               {cafe?.regionName ? ` • ${cafe.regionName}` : ''}
@@ -165,22 +131,22 @@ export function CafeDetailsScreen({ route }: Props) {
         {cafe?.address ? <Text style={[styles.address, { color: theme.text }]}>{cafe.address}</Text> : null}
         {cafe?.description ? <Text style={[styles.desc, { color: theme.muted }]}>{cafe.description}</Text> : null}
 
-        {brandQuery.data ? (
-          <View style={[styles.brandCard, { borderColor: theme.border }]}>
-            <Text style={[styles.brandTitle, { color: theme.text }]}>{brandQuery.data.name}</Text>
-            {brandQuery.data.description ? (
+        {cafe?.brand ? (
+          <View style={[styles.brandCard, { borderColor: theme.border, backgroundColor: theme.card }]}>
+            <Text style={[styles.brandTitle, { color: theme.text }]}>{cafe.brand.name}</Text>
+            {cafe.brand.description ? (
               <Text style={[styles.brandDesc, { color: theme.muted }]} numberOfLines={3}>
-                {brandQuery.data.description}
+                {cafe.brand.description}
               </Text>
             ) : null}
           </View>
         ) : null}
 
-        <View style={[styles.reviewsCard, { borderColor: theme.border }]}>
+        <View style={[styles.reviewsCard, { borderColor: theme.border, backgroundColor: theme.card }]}>
           <View style={styles.reviewsHeader}>
             <Text style={[styles.brandTitle, { color: theme.text }]}>{t('cafes.reviews.title')}</Text>
             <Pressable
-              onPress={() => navigate('CafeReviews', { cafeId: cafe?.id ?? id, cafeName: cafe?.name })}
+              onPress={() => navigation.navigate('CafeReviews', { cafeId: cafe?.id ?? id, cafeName: cafe?.name })}
               style={({ pressed }) => [styles.linkBtn, pressed && styles.pressed]}
             >
               <Text style={[styles.linkBtnText, { color: theme.accent }]}>{t('cafes.reviews.open')}</Text>
@@ -190,7 +156,7 @@ export function CafeDetailsScreen({ route }: Props) {
           {reviewsPreviewQuery.data?.items?.length ? (
             <View style={{ gap: 10, marginTop: 10 }}>
               {reviewsPreviewQuery.data.items.slice(0, 3).map((r) => (
-                <View key={r.id} style={[styles.reviewItem, { borderColor: theme.border }]}>
+                <View key={r.id} style={[styles.reviewItem, { borderColor: theme.border, backgroundColor: theme.bg }]}>
                   <View style={styles.reviewTopRow}>
                     <Text style={[styles.reviewUser, { color: theme.text }]} numberOfLines={1}>
                       {r.userName || 'User'}
@@ -214,22 +180,24 @@ export function CafeDetailsScreen({ route }: Props) {
           )}
 
           <Pressable
-            onPress={() => navigate('ReviewCreate', { cafeId: cafe?.id ?? id, cafeName: cafe?.name })}
+            onPress={() =>
+              navigation.navigate('ReviewCreate', { cafeId: cafe?.id ?? id, cafeName: cafe?.name })
+            }
             style={({ pressed }) => [styles.secondaryAction, { borderColor: theme.border }, pressed && styles.pressed]}
           >
             <Text style={[styles.secondaryActionText, { color: theme.text }]}>{t('cafes.reviews.write')}</Text>
           </Pressable>
         </View>
 
-        {photosQuery.data?.urls?.length ? (
+        {photoUrls.length ? (
           <>
             {/* Preload a few images invisibly, show strip only if at least one loads */}
             {!photosLoaded ? (
               <View style={styles.hiddenPreload}>
-                {photosQuery.data.urls.slice(0, 3).map((u) => (
+                {photoUrls.slice(0, 3).map((u) => (
                   <Image
                     key={`pre-${u}`}
-                    source={{ uri: resolveFileUrl(u) ?? u }}
+                    source={{ uri: u }}
                     style={styles.hiddenPreloadImg}
                     onLoad={() => setPhotosLoaded(true)}
                     onError={() => {}}
@@ -240,10 +208,10 @@ export function CafeDetailsScreen({ route }: Props) {
 
             {photosLoaded ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photosRow}>
-                {photosQuery.data.urls.slice(0, 12).map((u) => (
+                {photoUrls.slice(0, 12).map((u) => (
                   <Image
                     key={u}
-                    source={{ uri: resolveFileUrl(u) ?? u }}
+                    source={{ uri: u }}
                     style={[styles.photo, { borderColor: theme.border }]}
                   />
                 ))}
@@ -267,19 +235,6 @@ export function CafeDetailsScreen({ route }: Props) {
           >
             <Text style={styles.primaryBtnText}>Book</Text>
           </Pressable>
-
-          <Pressable
-            onPress={() => setShowRaw((v) => !v)}
-            style={({ pressed }) => [styles.rawButton, pressed && styles.pressed]}
-          >
-            <Text style={styles.rawButtonText}>{t('cafes.details.raw')}</Text>
-          </Pressable>
-
-          {showRaw ? (
-            <View style={styles.rawCard}>
-              <Text style={styles.mono}>{JSON.stringify(cafe, null, 2)}</Text>
-            </View>
-          ) : null}
 
           {cafe?.createdAt ? (
             <Text style={[styles.meta, { color: theme.muted }]}>
@@ -332,6 +287,7 @@ const styles = StyleSheet.create({
   reviewUser: { fontSize: 12, fontWeight: '800', flex: 1 },
   reviewDate: { fontSize: 11 },
   reviewStarsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
+  verified: { fontSize: 11, fontWeight: '700', color: '#059669' },
   reviewComment: { fontSize: 12, marginTop: 6, lineHeight: 16 },
   secondaryAction: { marginTop: 10, height: 40, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   secondaryActionText: { fontSize: 13, fontWeight: '700' },
@@ -347,18 +303,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   primaryBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  rawButton: {
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginTop: 12,
-  },
-  rawButtonText: { fontSize: 13, fontWeight: '600' },
-  rawCard: { padding: 12, borderRadius: 12, backgroundColor: '#f5f5f5', marginTop: 12 },
-  mono: { fontFamily: 'monospace', fontSize: 12 },
   meta: { marginTop: 12, fontSize: 12, opacity: 0.8 },
   pressed: { opacity: 0.85 },
 });

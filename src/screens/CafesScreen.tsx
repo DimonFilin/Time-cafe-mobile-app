@@ -5,12 +5,9 @@ import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { getCafes, type CafesSortBy, type CafesSortOrder } from '@/api/cafes';
-import { getBrandLogoSignedUrl } from '@/api/brands';
 import { StarRating } from '@/components/StarRating';
 import { t } from '@/i18n';
 import type { CafesStackParamList } from '@/navigation/stacks';
-import { getStableColorFromId } from '@/utils/colors';
-import { resolveFileUrl } from '@/utils/files';
 
 type Props = StackScreenProps<CafesStackParamList, 'CafesList'>;
 
@@ -31,26 +28,12 @@ function getInitial(name?: string | null) {
 }
 
 function CafeThumb(props: {
-  brandId?: string;
-  fallbackUri?: string | null;
+  uri?: string | null;
   title?: string | null;
   color: string;
 }) {
-  const { brandId, fallbackUri, title, color } = props;
+  const { uri, title, color } = props;
   const [failed, setFailed] = useState(false);
-
-  const logoQuery = useQuery({
-    queryKey: ['brand', brandId, 'logo-url'],
-    queryFn: () => getBrandLogoSignedUrl(String(brandId)),
-    enabled: !!brandId,
-    retry: false,
-    staleTime: 10 * 60 * 1000,
-    refetchOnMount: false,
-  });
-
-  const uri =
-    (logoQuery.data?.url ? resolveFileUrl(logoQuery.data.url) ?? logoQuery.data.url : null) ||
-    (fallbackUri ? resolveFileUrl(fallbackUri) ?? fallbackUri : null);
 
   useEffect(() => {
     setFailed(false);
@@ -68,7 +51,7 @@ function CafeThumb(props: {
           onError={() => {
             if (__DEV__) {
               // eslint-disable-next-line no-console
-              console.log('[CafeThumb] image failed', { brandId, uri });
+              console.log('[CafeThumb] image failed', { uri });
             }
             setFailed(true);
           }}
@@ -256,48 +239,62 @@ export function CafesScreen({ navigation }: Props) {
         renderItem={({ item }) => (
           <Pressable
             onPress={() => navigation.navigate('CafeDetails', { id: item.id, title: item.name })}
-            style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+            style={({ pressed }) => [
+              styles.item,
+              { backgroundColor: item.presentation.theme.background },
+              pressed && styles.itemPressed,
+            ]}
           >
             {(() => {
-              const stripeColor = getStableColorFromId(item.brandId || item.id);
+              const stripeColor = item.presentation.theme.primary;
               return (
                 <>
                   <View style={[styles.stripe, { backgroundColor: stripeColor }]} />
-            <View style={styles.itemBody}>
-              <View style={styles.itemTopRow}>
-                <CafeThumb
-                  brandId={item.brandId}
-                  fallbackUri={item.photos?.[0] ?? null}
-                  title={item.name}
-                  color={stripeColor}
-                />
+                  <View style={styles.itemBody}>
+                    <View style={styles.itemTopRow}>
+                      <CafeThumb
+                        uri={item.presentation.assets.thumbnailUrl}
+                        title={item.name}
+                        color={stripeColor}
+                      />
 
-                <View style={styles.itemMain}>
-                  <Text style={styles.itemTitle} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text style={styles.itemSub} numberOfLines={2}>
-                    {item.address}
-                    {item.city ? ` • ${item.city}` : ''}
-                  </Text>
-                  {item.brandName ? (
-                    <Text style={styles.itemBrand} numberOfLines={1}>
-                      {item.brandName}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
+                      <View style={styles.itemMain}>
+                        <Text
+                          style={[
+                            styles.itemTitle,
+                            { color: item.presentation.theme.text },
+                            item.presentation.theme.fontFamily
+                              ? { fontFamily: item.presentation.theme.fontFamily }
+                              : null,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {item.name}
+                        </Text>
+                        <Text style={[styles.itemSub, { color: item.presentation.theme.text }]} numberOfLines={2}>
+                          {item.presentation.subtitle}
+                        </Text>
+                        {item.presentation.brandLabel ? (
+                          <Text
+                            style={[styles.itemBrand, { color: item.presentation.theme.accent }]}
+                            numberOfLines={1}
+                          >
+                            {item.presentation.brandLabel}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
 
-              <View style={styles.itemBottomRow}>
-                <View style={styles.ratingRow}>
-                  <StarRating value={Number(item.rating ?? 0)} />
-                  <Text style={styles.itemMeta}>
-                    {typeof item.rating === 'number' ? item.rating.toFixed(1) : '—'}
-                    {typeof item.reviewsCount === 'number' ? ` (${item.reviewsCount})` : ''}
-                  </Text>
-                </View>
-              </View>
-            </View>
+                    <View style={styles.itemBottomRow}>
+                      <View style={styles.ratingRow}>
+                        <StarRating value={Number(item.rating ?? 0)} />
+                        <Text style={styles.itemMeta}>
+                          {typeof item.rating === 'number' ? item.rating.toFixed(1) : '—'}
+                          {typeof item.reviewsCount === 'number' ? ` (${item.reviewsCount})` : ''}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
                 </>
               );
             })()}

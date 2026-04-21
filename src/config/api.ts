@@ -17,7 +17,12 @@ export const cafeApi = axios.create({
 function ensureJsonContentType(config: InternalAxiosRequestConfig) {
   // For multipart/FormData requests axios must set the boundary itself.
   const anyData = (config as any).data;
-  const isFormData = typeof FormData !== 'undefined' && anyData instanceof FormData;
+  const isFormData =
+    typeof FormData !== 'undefined' &&
+    Boolean(anyData) &&
+    (anyData instanceof FormData ||
+      anyData?.constructor?.name === 'FormData' ||
+      (typeof anyData.append === 'function' && Array.isArray(anyData._parts)));
   if (isFormData) {
     if (config.headers && 'Content-Type' in config.headers) {
       delete (config.headers as any)['Content-Type'];

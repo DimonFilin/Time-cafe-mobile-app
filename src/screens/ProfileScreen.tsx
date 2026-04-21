@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { getMyAvatarSignedUrl, me, updateMe, uploadMyAvatar, type UpdateMeInput } from '@/api/auth';
 import { clearPersistedSession } from '@/auth/session';
 import { FullscreenImageModal } from '@/components/FullscreenImageModal';
+import { MoneyAmount } from '@/components/currency/MoneyAmount';
 import { t } from '@/i18n';
 import { useAuthStore } from '@/store/authStore';
 import { formatDateTime } from '@/utils/dates';
@@ -293,9 +294,16 @@ export function ProfileScreen() {
         <Text style={styles.row}>
           <Text style={styles.k}>phone</Text>: {(user?.phone as any) ?? '—'}
         </Text>
-        <Text style={styles.row}>
-          <Text style={styles.k}>balance</Text>: {user?.balance ?? '—'}
-        </Text>
+        <View style={[styles.row, { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }]}>
+          <Text>
+            <Text style={styles.k}>balance</Text>:
+          </Text>
+          {user?.balance != null ? (
+            <MoneyAmount value={user.balance} textStyle={styles.rowValue} iconSize={14} />
+          ) : (
+            <Text style={styles.rowValue}>—</Text>
+          )}
+        </View>
         <Text style={styles.row}>
           <Text style={styles.k}>createdAt</Text>: {formatDateTime(user?.createdAt as any, 'PPpp')}
         </Text>
@@ -424,6 +432,7 @@ const styles = StyleSheet.create({
   avatarSub: { fontSize: 12, opacity: 0.65, marginTop: 2 },
   card: { width: '100%', padding: 12, borderRadius: 12, backgroundColor: '#f5f5f5', marginBottom: 12 },
   row: { fontSize: 13, marginBottom: 6 },
+  rowValue: { fontSize: 13, fontFamily: 'monospace' },
   k: { fontWeight: '700' },
   label: { fontSize: 12, opacity: 0.7, marginBottom: 6 },
   hint: { fontSize: 12, opacity: 0.6, marginTop: 6 },

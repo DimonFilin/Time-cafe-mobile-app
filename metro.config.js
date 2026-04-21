@@ -1,6 +1,16 @@
 const path = require('path');
 const { getDefaultConfig } = require('expo/metro-config');
 
+if (!Array.prototype.toReversed) {
+  Object.defineProperty(Array.prototype, 'toReversed', {
+    value() {
+      return [...this].reverse();
+    },
+    writable: true,
+    configurable: true,
+  });
+}
+
 const config = getDefaultConfig(__dirname);
 
 // On Windows with hoisted node_modules Metro may try to resolve some Expo deps

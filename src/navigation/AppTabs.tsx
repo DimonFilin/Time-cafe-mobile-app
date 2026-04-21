@@ -7,6 +7,8 @@ import { t } from '@/i18n';
 import type { BookingsStackParamList, CafesStackParamList } from '@/navigation/stacks';
 import { BookingDetailsScreen } from '@/screens/BookingDetailsScreen';
 import { BookingsScreen } from '@/screens/BookingsScreen';
+import { OrderFromBookingScreen } from '@/screens/OrderFromBookingScreen';
+import { OrderChatScreen } from '@/screens/OrderChatScreen';
 import { CafeDetailsScreen } from '@/screens/CafeDetailsScreen';
 import { CafesScreen } from '@/screens/CafesScreen';
 import { CafeReviewsScreen } from '@/screens/CafeReviewsScreen';
@@ -58,6 +60,16 @@ function BookingsStackNavigator() {
         name="BookingDetails"
         component={BookingDetailsScreen}
         options={({ route }) => ({ title: route.params.title ?? t('appointments.detailsTitle') })}
+      />
+      <BookingsStack.Screen
+        name="OrderFromBooking"
+        component={OrderFromBookingScreen}
+        options={{ title: t('appointments.orderFromBooking') ?? 'Заказ по брони' }}
+      />
+      <BookingsStack.Screen
+        name="OrderChat"
+        component={OrderChatScreen}
+        options={{ title: 'Чат с кафе' }}
       />
     </BookingsStack.Navigator>
   );

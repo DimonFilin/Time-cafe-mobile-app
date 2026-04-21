@@ -1,11 +1,14 @@
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { cancelAppointment, getAppointmentById } from '@/api/appointments';
+import { getMyOrders } from '@/api/orders';
+import { getOrderChatByOrder } from '@/api/order-chat';
 import { FullscreenQrModal } from '@/components/FullscreenQrModal';
+import { MoneyAmount } from '@/components/currency/MoneyAmount';
 import { t } from '@/i18n';
 import type { BookingsStackParamList } from '@/navigation/stacks';
 import { useAuthStore } from '@/store/authStore';
@@ -28,14 +31,22 @@ function getStatusColors(status: 'pending' | 'confirmed' | 'completed' | 'cancel
   }
 }
 
-export function BookingDetailsScreen({ route }: Props) {
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Ожидает',
+  CONFIRMED: 'Подтверждён',
+  COMPLETED: 'Завершён',
+  CANCELLED: 'Отменён',
+};
+
+export function BookingDetailsScreen({ route, navigation }: Props) {
   const { id } = route.params;
   const queryClient = useQueryClient();
   const viewer = useAuthStore((s) => s.user);
-  const [showRaw, setShowRaw] = useState(false);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [qrVisible, setQrVisible] = useState(false);
+  const [chatEnabled, setChatEnabled] = useState<boolean>(true);
+  const [chatCheckLoading, setChatCheckLoading] = useState(false);
 
   const bookingQuery = useQuery({
     queryKey: ['appointment', id],
@@ -43,8 +54,21 @@ export function BookingDetailsScreen({ route }: Props) {
     retry: false,
   });
 
+  const ordersQuery = useQuery({
+    queryKey: ['orders', id],
+    queryFn: () => getMyOrders({ appointmentId: id, limit: 50 }),
+    enabled: !!id,
+  });
+
   const booking = bookingQuery.data;
+  const orders = ordersQuery.data?.items ?? [];
+  useEffect(() => {
+    if (booking) {
+      console.log('[BookingDetails] booking payload', booking);
+    }
+  }, [booking]);
   const canCancel = booking?.status === 'pending' || booking?.status === 'confirmed';
+  const canOrder = booking?.status === 'pending' || booking?.status === 'confirmed';
 
   const cancelMutation = useMutation({
     mutationFn: cancelAppointment,
@@ -61,6 +85,23 @@ export function BookingDetailsScreen({ route }: Props) {
     if (!booking) return null;
     return `${t(`appointments.status_${booking.status}`)} • ${formatDateTime(booking.dateTime)} • ${booking.duration}m`;
   }, [booking?.status, booking?.dateTime, booking?.duration]);
+
+  useEffect(() => {
+    const loadChatEnabled = async () => {
+      try {
+        setChatCheckLoading(true);
+        // Try booking id first; backend resolves order by id or by appointmentId fallback.
+        const chat = await getOrderChatByOrder(id);
+        setChatEnabled(chat.isEnabled !== false);
+      } catch {
+        // Keep default enabled when chat metadata cannot be resolved yet
+        setChatEnabled(true);
+      } finally {
+        setChatCheckLoading(false);
+      }
+    };
+    void loadChatEnabled();
+  }, [id]);
 
   const qrValue = useMemo(() => {
     if (!booking) return '';
@@ -90,26 +131,10 @@ export function BookingDetailsScreen({ route }: Props) {
             </View>
             {meta ? <Text style={styles.meta}>{formatDateTime(booking.dateTime)} • {booking.duration}m</Text> : null}
 
-            <View style={styles.kvRow}>
-              <Text style={styles.k}>id</Text>
-              <Text style={styles.v}>{booking.id}</Text>
-            </View>
-            <View style={styles.kvRow}>
-              <Text style={styles.k}>cafeId</Text>
-              <Text style={styles.v}>{booking.cafeId}</Text>
-            </View>
-
             {booking.totalAmount ? (
               <View style={styles.kvRow}>
                 <Text style={styles.k}>totalAmount</Text>
-                <Text style={styles.v}>{booking.totalAmount}</Text>
-              </View>
-            ) : null}
-
-            {booking.paymentMethod ? (
-              <View style={styles.kvRow}>
-                <Text style={styles.k}>paymentMethod</Text>
-                <Text style={styles.v}>{booking.paymentMethod}</Text>
+                <MoneyAmount value={booking.totalAmount} textStyle={styles.v} iconSize={13} />
               </View>
             ) : null}
 
@@ -120,12 +145,6 @@ export function BookingDetailsScreen({ route }: Props) {
               </>
             ) : null}
 
-            {booking.qrCode ? (
-              <>
-                <Text style={[styles.k, { marginTop: 10 }]}>qrCode</Text>
-                <Text style={styles.vInline}>{booking.qrCode}</Text>
-              </>
-            ) : null}
           </View>
 
           <Pressable
@@ -140,6 +159,73 @@ export function BookingDetailsScreen({ route }: Props) {
             </View>
           </Pressable>
 
+          {canOrder ? (
+            <Pressable
+              onPress={() =>
+                navigation.navigate('OrderFromBooking', {
+                  appointmentId: booking.id,
+                  cafeId: booking.cafeId,
+                  cafeName: booking.cafeName ?? undefined,
+                })
+              }
+              style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
+            >
+              <Text style={styles.primaryBtnText}>
+                {orders.length > 0 ? 'Дозаказать' : 'Заказать'}
+              </Text>
+            </Pressable>
+          ) : null}
+
+          <Pressable
+            disabled={!chatEnabled || chatCheckLoading}
+            onPress={() => {
+              navigation.navigate('OrderChat', {
+                orderId: id,
+                cafeName: booking.cafeName ?? undefined,
+              });
+            }}
+            style={({ pressed }) => [
+              styles.chatBtn,
+              (!chatEnabled || chatCheckLoading) && styles.disabled,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.chatBtnText}>
+              {chatCheckLoading
+                ? 'Проверка чата...'
+                : !chatEnabled
+                  ? 'Чат отключен в кафе'
+                  : 'Связаться с сотрудниками'}
+            </Text>
+          </Pressable>
+
+          {orders.length > 0 ? (
+            <View style={styles.ordersCard}>
+              <Text style={styles.ordersTitle}>Мои заказы</Text>
+              {orders.map((o) => (
+                <Pressable
+                  key={o.id}
+                  style={styles.orderRow}
+                  onPress={() =>
+                    navigation.navigate('OrderChat', {
+                      orderId: o.id,
+                      cafeName: booking.cafeName ?? undefined,
+                    })
+                  }
+                >
+                  <Text style={styles.orderNumber}>#{o.orderNumber}</Text>
+                  <Text style={styles.orderStatus}>{ORDER_STATUS_LABELS[o.status] ?? o.status}</Text>
+                  <MoneyAmount
+                    value={o.totalAmount}
+                    textStyle={styles.orderTotal}
+                    iconSize={14}
+                    style={{ flexShrink: 0 }}
+                  />
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+
           {canCancel ? (
             <Pressable
               onPress={() => setCancelModalVisible(true)}
@@ -150,16 +236,6 @@ export function BookingDetailsScreen({ route }: Props) {
           ) : null}
 
           {cancelMutation.error ? <Text style={styles.error}>{getErrorMessage(cancelMutation.error)}</Text> : null}
-
-          <Pressable onPress={() => setShowRaw((v) => !v)} style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}>
-            <Text style={styles.secondaryBtnText}>{t('appointments.raw')}</Text>
-          </Pressable>
-
-          {showRaw ? (
-            <View style={styles.rawCard}>
-              <Text style={styles.mono}>{JSON.stringify(booking, null, 2)}</Text>
-            </View>
-          ) : null}
 
           <Modal visible={cancelModalVisible} animationType="fade" transparent onRequestClose={() => setCancelModalVisible(false)}>
             <View style={styles.modalOverlay}>
@@ -223,6 +299,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   secondaryBtnText: { fontSize: 14, fontWeight: '600', color: '#111', textAlign: 'center' },
+  primaryBtn: {
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingHorizontal: 12,
+  },
+  primaryBtnText: { fontSize: 14, fontWeight: '600', color: '#fff', textAlign: 'center' },
+  chatBtn: {
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#16a34a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingHorizontal: 12,
+  },
+  chatBtnText: { fontSize: 14, fontWeight: '600', color: '#fff', textAlign: 'center' },
+  ordersCard: { marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: '#f5f5f5' },
+  ordersTitle: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  orderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  orderNumber: { fontSize: 13, fontWeight: '600', flex: 1 },
+  orderStatus: { fontSize: 12, opacity: 0.8 },
+  orderTotal: { fontSize: 13, fontWeight: '600' },
   dangerBtn: {
     height: 44,
     borderRadius: 12,
@@ -234,8 +336,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   dangerBtnText: { fontSize: 14, fontWeight: '600', color: '#fff', textAlign: 'center' },
-  rawCard: { padding: 12, borderRadius: 12, backgroundColor: '#f5f5f5', marginTop: 12 },
-  mono: { fontFamily: 'monospace', fontSize: 12 },
   qrCard: {
     marginTop: 12,
     alignSelf: 'center',

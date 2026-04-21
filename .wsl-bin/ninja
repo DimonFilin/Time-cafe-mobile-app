@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+"/mnt/c/Users/vladf/AppData/Local/Android/Sdk/cmake/3.22.1/bin/ninja.exe" "$@"
