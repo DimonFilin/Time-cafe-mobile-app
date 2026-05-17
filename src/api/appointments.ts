@@ -6,6 +6,8 @@ export type Appointment = {
   id: string;
   cafeId: string;
   cafeName?: string;
+  roomId?: string;
+  roomName?: string;
   dateTime: string;
   duration: number;
   status: AppointmentStatus;
@@ -13,6 +15,8 @@ export type Appointment = {
   totalAmount?: string;
   paymentMethod?: 'CARD' | 'BALANCE' | 'CASH' | 'FREE';
   notes?: string;
+  roomSnapshot?: Record<string, unknown>;
+  selectedAssets?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 };
@@ -51,11 +55,14 @@ export async function cancelAppointment(params: { id: string; reason?: string })
 
 export async function createAppointment(input: {
   cafeId: string;
+  roomId: string;
   dateTime: string;
   duration: number;
+  billingMode?: 'HOURLY' | 'MINUTE';
   paymentMethod?: 'CARD' | 'BALANCE' | 'CASH' | 'FREE';
   cardId?: string;
   notes?: string;
+  selectedSharedAssetIds?: string[];
 }): Promise<Appointment> {
   const res = await sharedApi.post('/appointments', input);
   return res.data as Appointment;

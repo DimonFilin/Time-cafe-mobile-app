@@ -1,5 +1,8 @@
+import * as FileSystem from 'expo-file-system/legacy';
+
+import { refreshAccessToken } from '@/auth/session';
 import { sharedApi } from '@/config/api';
-import axios from 'axios';
+import { SHARED_API_URL } from '@/config/urls';
 import { useAuthStore } from '@/store/authStore';
 
 export interface OrderChatMessage {
@@ -27,64 +30,79 @@ export async function getOrderChatMessages(chatId: string) {
   return res.data.items;
 }
 
+function sharedApiOrigin(): string {
+  return String(SHARED_API_URL || '').replace(/\/+$/, '');
+}
+
+/**
+ * Загрузка вложения: в RN `fetch`+multipart часто даёт «Network request failed»;
+ * тот же путь, что для аватара — `FileSystem.uploadAsync` (стабильнее на Android).
+ */
 export async function uploadOrderChatAttachment(chatId: string, file: {
   uri: string;
   type: string;
   name: string;
-}) {
-  const formData = new FormData();
-  formData.append('file', file as any);
-  const url = `/order-chats/${chatId}/uploads`;
-  const extractError = (error: unknown) => {
-    if (axios.isAxiosError(error)) {
-      return {
-        message: error.message,
-        code: error.code,
-        status: error.response?.status,
-        responseData: error.response?.data,
-        method: error.config?.method,
-        baseURL: error.config?.baseURL,
-        url: error.config?.url,
-        timeout: error.config?.timeout,
-      };
+}): Promise<{ id: string; url: string }> {
+  const url = `${sharedApiOrigin()}/order-chats/${chatId}/uploads`;
+
+  async function resolveUploadableUri(): Promise<string> {
+    let fileUri = file.uri;
+    if (fileUri.startsWith('content://')) {
+      const safeName = file.name.replace(/[^\w.\-]+/g, '-') || 'image.jpg';
+      const tmpPath = `${FileSystem.cacheDirectory}order-chat-${Date.now()}-${safeName}`;
+      await FileSystem.copyAsync({ from: fileUri, to: tmpPath });
+      fileUri = tmpPath;
     }
-    if (error instanceof Error) {
-      return { message: error.message, stack: error.stack };
+    return fileUri;
+  }
+
+  async function doUpload(accessToken: string): Promise<{ id: string; url: string }> {
+    const fileUri = await resolveUploadableUri();
+    const res = await FileSystem.uploadAsync(url, fileUri, {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      fieldName: 'file',
+      mimeType: file.type,
+      parameters: {},
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (res.status === 401) {
+      throw new Error('UNAUTHORIZED');
     }
-    return { message: String(error) };
-  };
-  const baseURL = String(sharedApi.defaults.baseURL || '').replace(/\/+$/, '');
-  const accessToken = useAuthStore.getState().accessToken;
-  const absoluteUrl = `${baseURL}${url}`;
-  const requestInit: RequestInit = {
-    method: 'POST',
-    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-    body: formData as any,
-  };
+    if (res.status < 200 || res.status >= 300) {
+      throw new Error(`Upload failed (${res.status}): ${String(res.body).slice(0, 400)}`);
+    }
+    try {
+      return JSON.parse(res.body) as { id: string; url: string };
+    } catch {
+      throw new Error('Failed to parse upload response');
+    }
+  }
+
+  let accessToken = useAuthStore.getState().accessToken;
+  if (!accessToken) {
+    throw new Error('Not authenticated');
+  }
 
   try {
-    const response = await fetch(absoluteUrl, requestInit);
-    if (!response.ok) {
-      const text = await response.text();
-      console.error('[OrderChatAPI] upload failed with HTTP response', {
-        chatId,
-        file,
-        status: response.status,
-        statusText: response.statusText,
-        body: text,
-        request: { url: absoluteUrl, hasToken: Boolean(accessToken) },
-      });
-      throw new Error(`Upload failed with status ${response.status}`);
+    return await doUpload(accessToken);
+  } catch (e) {
+    if (e instanceof Error && e.message === 'UNAUTHORIZED') {
+      const next = await refreshAccessToken();
+      if (!next) throw new Error('Session expired');
+      accessToken = next;
+      return await doUpload(accessToken);
     }
-    return (await response.json()) as { id: string; url: string };
-  } catch (error) {
-    console.error('[OrderChatAPI] upload failed at transport layer', {
+    console.error('[OrderChatAPI] upload failed', {
       chatId,
-      file,
-      diagnostics: extractError(error),
-      request: { url: absoluteUrl, hasToken: Boolean(accessToken) },
+      file: { name: file.name, type: file.type },
+      request: { url },
+      error: e,
     });
-    throw error;
+    throw e;
   }
 }
 

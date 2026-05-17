@@ -14,6 +14,7 @@ import { CafesScreen } from '@/screens/CafesScreen';
 import { CafeReviewsScreen } from '@/screens/CafeReviewsScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { ReviewCreateScreen } from '@/screens/ReviewCreateScreen';
+import { Colors } from '@/utils/theme';
 
 export type AppTabsParamList = {
   Cafes: NavigatorScreenParams<CafesStackParamList>;
@@ -27,7 +28,16 @@ const BookingsStack = createStackNavigator<BookingsStackParamList>();
 
 function CafesStackNavigator() {
   return (
-    <CafesStack.Navigator screenOptions={{ headerTitleAlign: 'center' }}>
+    <CafesStack.Navigator
+      screenOptions={{
+        headerTitleAlign: 'center',
+        headerStyle: { backgroundColor: Colors.white },
+        headerTintColor: Colors.textPrimary,
+        headerTitleStyle: { fontWeight: '700', color: Colors.textPrimary },
+        headerShadowVisible: false,
+        headerBackgroundContainerStyle: { borderBottomWidth: 1, borderBottomColor: Colors.border },
+      }}
+    >
       <CafesStack.Screen name="CafesList" component={CafesScreen} options={{ title: t('cafes.listTitle') }} />
       <CafesStack.Screen
         name="CafeDetails"
@@ -42,7 +52,9 @@ function CafesStackNavigator() {
       <CafesStack.Screen
         name="ReviewCreate"
         component={ReviewCreateScreen}
-        options={{ title: t('cafes.reviews.write') }}
+        options={({ route }) => ({
+          title: route.params?.reviewId ? 'Редактировать отзыв' : t('cafes.reviews.write'),
+        })}
       />
     </CafesStack.Navigator>
   );
@@ -50,7 +62,16 @@ function CafesStackNavigator() {
 
 function BookingsStackNavigator() {
   return (
-    <BookingsStack.Navigator screenOptions={{ headerTitleAlign: 'center' }}>
+    <BookingsStack.Navigator
+      screenOptions={{
+        headerTitleAlign: 'center',
+        headerStyle: { backgroundColor: Colors.white },
+        headerTintColor: Colors.textPrimary,
+        headerTitleStyle: { fontWeight: '700', color: Colors.textPrimary },
+        headerShadowVisible: false,
+        headerBackgroundContainerStyle: { borderBottomWidth: 1, borderBottomColor: Colors.border },
+      }}
+    >
       <BookingsStack.Screen
         name="BookingsList"
         component={BookingsScreen}
@@ -98,8 +119,14 @@ export function AppTabs() {
 
           return <Ionicons name={name as any} size={iconSize} color={tint} />;
         },
-        tabBarActiveTintColor: '#111',
-        tabBarInactiveTintColor: '#777',
+        tabBarActiveTintColor: Colors.coffeeDark,
+        tabBarInactiveTintColor: Colors.textMuted,
+        tabBarStyle: {
+          backgroundColor: Colors.white,
+          borderTopColor: Colors.border,
+          borderTopWidth: 1,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       })}
     >
       <Tab.Screen name="Cafes" component={CafesStackNavigator} options={{ title: t('tabs.cafes') }} />

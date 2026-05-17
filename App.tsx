@@ -1,6 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StyleSheet, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { DebugFab } from '@/components/DebugFab';
 import { useHydrateSession } from '@/hooks/useHydrateSession';
@@ -21,14 +22,16 @@ export default function App() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <NavigationContainer ref={navigationRef}>
-        <View style={{ flex: 1 }}>
-          <RootNavigator />
-          <DebugFab />
-        </View>
-      </NavigationContainer>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <NavigationContainer ref={navigationRef}>
+          <View style={{ flex: 1 }}>
+            <RootNavigator />
+            <DebugFab />
+          </View>
+        </NavigationContainer>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
 

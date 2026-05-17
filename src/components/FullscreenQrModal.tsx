@@ -45,8 +45,6 @@ export function FullscreenQrModal({ visible, title, value, onClose }: Props) {
               <Image source={require('../../assets/favicon.png')} style={styles.centerLogo} />
             </View>
           </View>
-
-          <Text style={styles.hint}>Tap anywhere to close</Text>
         </Animated.View>
       </Pressable>
     </Modal>
@@ -93,10 +91,5 @@ const styles = StyleSheet.create({
     borderColor: '#eee',
   },
   centerLogo: { width: 40, height: 40, borderRadius: 12 },
-  hint: {
-    marginTop: 12,
-    fontSize: 12,
-    opacity: 0.7,
-  },
 });
 

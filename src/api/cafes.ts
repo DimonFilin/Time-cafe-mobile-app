@@ -39,6 +39,7 @@ type RawCafeDetails = {
   regionName?: string;
   createdAt?: string;
   updatedAt?: string;
+  openingHours?: Record<string, { open?: string; close?: string; closed?: boolean }> | null;
 };
 
 export type CafeTheme = {
@@ -105,6 +106,7 @@ export type CafeDetails = {
   regionName?: string;
   createdAt?: string;
   updatedAt?: string;
+  openingHours?: Record<string, { open?: string; close?: string; closed?: boolean }> | null;
   brand?: BrandPresentation;
   presentation: CafePresentation;
 };

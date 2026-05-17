@@ -1,7 +1,8 @@
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { getCafeById } from '@/api/cafes';
 import { getReviews } from '@/api/reviews';
@@ -10,6 +11,7 @@ import { t } from '@/i18n';
 import { navigate } from '@/navigation/navigationRef';
 import type { CafesStackParamList } from '@/navigation/stacks';
 import { formatDateTime } from '@/utils/dates';
+import { Colors, Radius, Spacing, Typography } from '@/utils/theme';
 
 type Props = StackScreenProps<CafesStackParamList, 'CafeDetails'>;
 
@@ -18,6 +20,14 @@ export function CafeDetailsScreen({ route, navigation }: Props) {
   const [logoFailed, setLogoFailed] = useState(false);
   const [bannerFailed, setBannerFailed] = useState(false);
   const [photosLoaded, setPhotosLoaded] = useState(false);
+  const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
+
+  const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  const DAY_LABELS: Record<string, string> = {
+    monday: 'Понедельник', tuesday: 'Вторник', wednesday: 'Среда',
+    thursday: 'Четверг', friday: 'Пятница', saturday: 'Суббота', sunday: 'Воскресенье',
+  };
+  const todayKey = DAY_KEYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
 
   const cafeQuery = useQuery({
     queryKey: ['cafe', id],
@@ -44,6 +54,7 @@ export function CafeDetailsScreen({ route, navigation }: Props) {
   const logoUrl = cafe?.presentation.assets.logoUrl;
   const bannerUrl = cafe?.presentation.assets.bannerUrl;
   const photoUrls = cafe?.presentation.assets.photoUrls || [];
+  const weeklySchedule = cafe?.openingHours;
 
   useEffect(() => {
     setLogoFailed(false);
@@ -131,6 +142,24 @@ export function CafeDetailsScreen({ route, navigation }: Props) {
         {cafe?.address ? <Text style={[styles.address, { color: theme.text }]}>{cafe.address}</Text> : null}
         {cafe?.description ? <Text style={[styles.desc, { color: theme.muted }]}>{cafe.description}</Text> : null}
 
+        {/* ── Schedule ── */}
+        {cafe?.openingHours ? (() => {
+          const today = cafe.openingHours[todayKey];
+          const todayText = today?.closed ? 'Закрыто' : (today?.open && today?.close ? `${today.open} – ${today.close}` : null);
+          return (
+            <Pressable
+              onPress={() => setScheduleModalVisible(true)}
+              style={({ pressed }) => [styles.scheduleRow, pressed && styles.pressed]}
+            >
+              <Ionicons name="time-outline" size={14} color={theme.accent} />
+              <Text style={[styles.scheduleText, { color: theme.accent }]}>
+                {todayText ? `Сегодня: ${todayText}` : 'Расписание'}
+              </Text>
+              <Ionicons name="chevron-forward" size={12} color={theme.muted} />
+            </Pressable>
+          );
+        })() : null}
+
         {cafe?.brand ? (
           <View style={[styles.brandCard, { borderColor: theme.border, backgroundColor: theme.card }]}>
             <Text style={[styles.brandTitle, { color: theme.text }]}>{cafe.brand.name}</Text>
@@ -159,13 +188,13 @@ export function CafeDetailsScreen({ route, navigation }: Props) {
                 <View key={r.id} style={[styles.reviewItem, { borderColor: theme.border, backgroundColor: theme.bg }]}>
                   <View style={styles.reviewTopRow}>
                     <Text style={[styles.reviewUser, { color: theme.text }]} numberOfLines={1}>
-                      {r.userName || 'User'}
+                      {r.userName || t('common.user')}
                     </Text>
                     <Text style={[styles.reviewDate, { color: theme.muted }]}>{formatDateTime(r.createdAt, 'PP')}</Text>
                   </View>
                   <View style={styles.reviewStarsRow}>
                     <StarRating value={r.rating} />
-                    {r.isVerified ? <Text style={styles.verified}>Verified</Text> : null}
+                    {r.isVerified ? <Text style={styles.verified}>{t('common.verified')}</Text> : null}
                   </View>
                   {r.comment ? (
                     <Text style={[styles.reviewComment, { color: theme.muted }]} numberOfLines={3}>
@@ -188,7 +217,6 @@ export function CafeDetailsScreen({ route, navigation }: Props) {
             <Text style={[styles.secondaryActionText, { color: theme.text }]}>{t('cafes.reviews.write')}</Text>
           </Pressable>
         </View>
-
         {photoUrls.length ? (
           <>
             {/* Preload a few images invisibly, show strip only if at least one loads */}
@@ -221,7 +249,7 @@ export function CafeDetailsScreen({ route, navigation }: Props) {
         ) : null}
       </View>
 
-      {cafeQuery.isLoading ? <Text>Loading...</Text> : null}
+      {cafeQuery.isLoading ? <Text>{t('common.loading')}</Text> : null}
 
       {cafe ? (
         <>
@@ -233,16 +261,54 @@ export function CafeDetailsScreen({ route, navigation }: Props) {
               pressed && styles.pressed,
             ]}
           >
-            <Text style={styles.primaryBtnText}>Book</Text>
+            <Text style={styles.primaryBtnText}>{t('common.bookNow')}</Text>
           </Pressable>
-
-          {cafe?.createdAt ? (
-            <Text style={[styles.meta, { color: theme.muted }]}>
-              Created: {formatDateTime(String(cafe.createdAt), 'PPpp')}
-            </Text>
-          ) : null}
         </>
       ) : null}
+
+      <Modal
+        visible={scheduleModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setScheduleModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Время работы</Text>
+            <View style={styles.scheduleList}>
+              {DAY_KEYS.map((dayKey) => {
+                const item = weeklySchedule?.[dayKey];
+                const isClosed = item?.closed;
+                const dayValue = isClosed
+                  ? 'Закрыто'
+                  : item?.open && item?.close
+                    ? `${item.open} – ${item.close}`
+                    : 'Не указано';
+                return (
+                  <View key={dayKey} style={styles.scheduleItemRow}>
+                    <Text style={[styles.scheduleItemDay, { color: theme.text }]}>
+                      {DAY_LABELS[dayKey]}
+                    </Text>
+                    <Text style={[styles.scheduleItemHours, { color: theme.muted }]}>
+                      {dayValue}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+            <Pressable
+              onPress={() => setScheduleModalVisible(false)}
+              style={({ pressed }) => [
+                styles.modalCloseBtn,
+                { borderColor: theme.border },
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.modalCloseText, { color: theme.text }]}>Закрыть</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
       </View>
     </ScrollView>
   );
@@ -291,6 +357,18 @@ const styles = StyleSheet.create({
   reviewComment: { fontSize: 12, marginTop: 6, lineHeight: 16 },
   secondaryAction: { marginTop: 10, height: 40, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   secondaryActionText: { fontSize: 13, fontWeight: '700' },
+  scheduleRow: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#F3F4F6',
+  },
+  scheduleText: { fontSize: 12, fontWeight: '700' },
   hiddenPreload: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   hiddenPreloadImg: { width: 1, height: 1 },
   photosRow: { paddingVertical: 12, gap: 10 },
@@ -303,7 +381,39 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   primaryBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  meta: { marginTop: 12, fontSize: 12, opacity: 0.8 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+  },
+  modalTitle: { fontSize: 15, fontWeight: '800', marginBottom: 10 },
+  scheduleList: { gap: 6 },
+  scheduleItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  scheduleItemDay: { fontSize: 13, fontWeight: '600' },
+  scheduleItemHours: { fontSize: 13, fontWeight: '500' },
+  modalCloseBtn: {
+    marginTop: 12,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseText: { fontSize: 13, fontWeight: '700' },
   pressed: { opacity: 0.85 },
 });
 

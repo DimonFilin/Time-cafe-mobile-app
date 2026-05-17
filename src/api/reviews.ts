@@ -51,3 +51,23 @@ export async function createReview(input: CreateReviewInput): Promise<Review> {
   return res.data as Review;
 }
 
+export type UpdateReviewInput = {
+  rating?: number;
+  comment?: string;
+};
+
+export async function updateReview(id: string, input: UpdateReviewInput): Promise<Review> {
+  const res = await sharedApi.patch(`/reviews/${id}`, input);
+  return res.data as Review;
+}
+
+export async function getMyReviewForCafe(cafeId: string, userId: string): Promise<Review | null> {
+  try {
+    const res = await sharedApi.get('/reviews', { params: { cafeId, limit: 50 } });
+    const data = res.data as { items: Review[] };
+    return data.items.find((r) => r.userId === userId) ?? null;
+  } catch {
+    return null;
+  }
+}
+

@@ -8,6 +8,7 @@ import { getCafes, type CafesSortBy, type CafesSortOrder } from '@/api/cafes';
 import { StarRating } from '@/components/StarRating';
 import { t } from '@/i18n';
 import type { CafesStackParamList } from '@/navigation/stacks';
+import { Colors, Radius, Spacing, Styles, Typography } from '@/utils/theme';
 
 type Props = StackScreenProps<CafesStackParamList, 'CafesList'>;
 
@@ -103,13 +104,13 @@ export function CafesScreen({ navigation }: Props) {
       headerRight: () => (
         <View style={styles.headerActions}>
           <Pressable onPress={open} style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}>
-            <Ionicons name="search-outline" size={18} color="#111" />
+            <Ionicons name="search-outline" size={18} color={Colors.coffeeDark} />
           </Pressable>
           <Pressable onPress={open} style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}>
-            <Ionicons name="filter-outline" size={18} color="#111" />
+            <Ionicons name="filter-outline" size={18} color={Colors.coffeeDark} />
           </Pressable>
           <Pressable onPress={open} style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}>
-            <Ionicons name="swap-vertical-outline" size={18} color="#111" />
+            <Ionicons name="swap-vertical-outline" size={18} color={Colors.coffeeDark} />
           </Pressable>
         </View>
       ),
@@ -306,71 +307,100 @@ export function CafesScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  topText: { padding: 12 },
-  headerActions: { flexDirection: 'row', gap: 6, paddingRight: 8 },
-  headerIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  item: { flexDirection: 'row', gap: 12, padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  container: { flex: 1, backgroundColor: Colors.white },
+  topText: { padding: Spacing.md, color: Colors.textMuted, fontSize: Typography.sm },
+  headerActions: { flexDirection: 'row', gap: 6, paddingRight: Spacing.sm },
+  headerIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.beige,
+  },
+  item: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    padding: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+    backgroundColor: Colors.white,
+  },
   itemPressed: { opacity: 0.8 },
-  stripe: { width: 4, borderRadius: 999 },
-  itemBody: { flex: 1, gap: 10 },
-  itemTopRow: { flexDirection: 'row', gap: 10 },
+  stripe: { width: 4, borderRadius: Radius.full },
+  itemBody: { flex: 1, gap: Spacing.sm },
+  itemTopRow: { flexDirection: 'row', gap: Spacing.sm },
   itemMain: { flex: 1 },
-  thumb: { width: 54, height: 54, borderRadius: 14, backgroundColor: '#eee' },
+  thumb: { width: 54, height: 54, borderRadius: Radius.md, backgroundColor: Colors.beige },
   thumbImg: {
     ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
-    borderRadius: 14,
+    borderRadius: Radius.md,
     backgroundColor: 'transparent',
   },
-  thumbFallback: { backgroundColor: '#f3f4f6' },
+  thumbFallback: { backgroundColor: Colors.beige },
   thumbLetterWrap: { alignItems: 'center', justifyContent: 'center' },
   thumbLetter: {
-    color: '#fff',
+    color: Colors.textInverse,
     fontSize: 20,
     fontWeight: '800',
     textAlign: 'center',
     lineHeight: 22,
     includeFontPadding: false,
   },
-  itemTitle: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
-  itemSub: { fontSize: 12, opacity: 0.7 },
-  itemBrand: { fontSize: 12, fontWeight: '700', marginTop: 6 },
+  itemTitle: { fontSize: Typography.base, fontWeight: '700', marginBottom: 2 },
+  itemSub: { fontSize: Typography.sm, opacity: 0.7 },
+  itemBrand: { fontSize: Typography.sm, fontWeight: '700', marginTop: 6 },
   itemBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  itemMeta: { fontSize: 12, opacity: 0.7 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#fff', padding: 16, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
-  modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', marginTop: 10, marginBottom: 8 },
-  label: { fontSize: 12, opacity: 0.7, marginBottom: 6 },
-  input: {
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    paddingHorizontal: 12,
-    marginBottom: 10,
-  },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  chip: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: '#ddd' },
-  chipActive: { borderColor: '#111', backgroundColor: '#111' },
-  chipText: { fontSize: 12, color: '#111' },
-  chipTextActive: { color: '#fff', fontWeight: '700' },
-  modalButtonsRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
-  secondaryBtn: {
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  itemMeta: { fontSize: Typography.sm, color: Colors.textMuted },
+  // Modal
+  modalOverlay: {
     flex: 1,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#111',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
   },
-  secondaryBtnText: { fontSize: 14, fontWeight: '600', color: '#111' },
-  primaryBtn: { flex: 1, height: 44, borderRadius: 12, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
-  primaryBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
-  pressed: { opacity: 0.85 },
+  modalCard: {
+    backgroundColor: Colors.white,
+    padding: Spacing.lg,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    borderTopWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalTitle: {
+    fontSize: Typography.lg,
+    fontWeight: '700',
+    marginBottom: Spacing.md,
+    color: Colors.textPrimary,
+  },
+  sectionTitle: {
+    fontSize: Typography.base,
+    fontWeight: '700',
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+    color: Colors.textPrimary,
+  },
+  label: { ...Styles.label, marginBottom: Spacing.xs },
+  input: { ...Styles.input, marginBottom: Spacing.sm },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.sm },
+  chip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.beige,
+  },
+  chipActive: { borderColor: Colors.coffeeDark, backgroundColor: Colors.coffeeDark },
+  chipText: { fontSize: Typography.sm, color: Colors.textSecondary, fontWeight: '500' },
+  chipTextActive: { color: Colors.textInverse, fontWeight: '700' },
+  modalButtonsRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
+  secondaryBtn: { ...Styles.secondaryBtn, flex: 1 },
+  secondaryBtnText: Styles.secondaryBtnText,
+  primaryBtn: { ...Styles.primaryBtn, flex: 1 },
+  primaryBtnText: Styles.primaryBtnText,
+  pressed: Styles.pressed,
 });
 

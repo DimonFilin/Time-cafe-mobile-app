@@ -13,9 +13,11 @@ import {
 import { getCafeMenu, type MenuItem } from '@/api/menu';
 import { MoneyAmount } from '@/components/currency/MoneyAmount';
 import { createOrder } from '@/api/orders';
+import { t } from '@/i18n';
 import { useAuthStore } from '@/store/authStore';
 import type { BookingsStackParamList } from '@/navigation/stacks';
 import { getErrorMessage } from '@/utils/errors';
+import { Colors, Radius, Spacing, Typography } from '@/utils/theme';
 
 type Props = StackScreenProps<BookingsStackParamList, 'OrderFromBooking'>;
 
@@ -93,7 +95,7 @@ export function OrderFromBookingScreen({ route, navigation }: Props) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" />
-        <Text style={styles.muted}>Загрузка меню...</Text>
+        <Text style={styles.muted}>{t('orders.loading')}</Text>
       </View>
     );
   }
@@ -101,9 +103,9 @@ export function OrderFromBookingScreen({ route, navigation }: Props) {
   if (error || !menu) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.error}>{getErrorMessage(error) || 'Меню недоступно'}</Text>
+        <Text style={styles.error}>{getErrorMessage(error) || t('orders.menuUnavailable')}</Text>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>Назад</Text>
+          <Text style={styles.backBtnText}>{t('orders.back')}</Text>
         </Pressable>
       </View>
     );
@@ -112,7 +114,7 @@ export function OrderFromBookingScreen({ route, navigation }: Props) {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>{cafeName ?? 'Меню'}</Text>
+        <Text style={styles.title}>{cafeName ?? t('orders.title')}</Text>
         {menu.categories.map((cat) => (
           <View key={cat.id} style={styles.category}>
             <Text style={styles.categoryName}>{cat.name}</Text>
@@ -146,7 +148,7 @@ export function OrderFromBookingScreen({ route, navigation }: Props) {
                         onPress={() => addToCart(item, 1)}
                         style={styles.addBtn}
                       >
-                        <Text style={styles.addBtnText}>Добавить</Text>
+                        <Text style={styles.addBtnText}>{t('orders.add')}</Text>
                       </Pressable>
                     )}
                   </View>
@@ -157,9 +159,9 @@ export function OrderFromBookingScreen({ route, navigation }: Props) {
         ))}
         {cart.length > 0 ? (
           <View style={styles.cartSummary}>
-            <Text style={styles.cartTitle}>В заказе: {cart.length} позиций</Text>
+            <Text style={styles.cartTitle}>{t('orders.inOrder')}: {cart.length} {t('orders.positions')}</Text>
             <View style={styles.cartTotalRow}>
-              <Text style={styles.cartTotalLabel}>Итого:</Text>
+              <Text style={styles.cartTotalLabel}>{t('orders.total')}:</Text>
               <MoneyAmount value={totalSum} textStyle={styles.cartTotalAmount} iconSize={18} />
             </View>
           </View>
@@ -182,7 +184,7 @@ export function OrderFromBookingScreen({ route, navigation }: Props) {
             ]}
           >
             <Text style={styles.submitBtnText}>
-              {createOrderMutation.isPending ? 'Отправка...' : 'Оформить заказ'}
+              {createOrderMutation.isPending ? t('orders.submitting') : t('orders.submit')}
             </Text>
           </Pressable>
         </View>
@@ -192,50 +194,98 @@ export function OrderFromBookingScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: Colors.cream },
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 100 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 },
-  muted: { marginTop: 8, fontSize: 14, color: '#666' },
-  error: { fontSize: 14, color: '#b00020', textAlign: 'center' },
-  backBtn: { marginTop: 16, paddingVertical: 12, paddingHorizontal: 24, backgroundColor: '#eee', borderRadius: 12 },
-  backBtnText: { fontSize: 14, fontWeight: '600' },
-  title: { fontSize: 20, fontWeight: '700', marginBottom: 16 },
-  category: { marginBottom: 20 },
-  categoryName: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
+  scrollContent: { padding: Spacing.md, paddingBottom: 100 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
+  muted: { marginTop: Spacing.sm, fontSize: Typography.base, color: Colors.textMuted },
+  error: { fontSize: Typography.base, color: Colors.error, textAlign: 'center' },
+  backBtn: {
+    marginTop: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xl,
+    backgroundColor: Colors.beige,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  backBtnText: { fontSize: Typography.base, fontWeight: '600', color: Colors.textPrimary },
+  title: { fontSize: Typography.xl, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.lg },
+  category: { marginBottom: Spacing.lg },
+  categoryName: {
+    fontSize: Typography.md,
+    fontWeight: '700',
+    color: Colors.coffeeDark,
+    marginBottom: Spacing.sm,
+    paddingBottom: Spacing.xs,
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.border,
+  },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: Colors.borderLight,
+    backgroundColor: Colors.white,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.sm,
+    marginBottom: 2,
   },
   itemInfo: { flex: 1 },
-  itemName: { fontSize: 15, fontWeight: '500' },
-  itemPrice: { fontSize: 13, color: '#666', marginTop: 2 },
-  itemActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  qtyBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#eee', alignItems: 'center', justifyContent: 'center' },
-  qtyBtnText: { fontSize: 18, fontWeight: '600' },
-  qtyText: { minWidth: 24, textAlign: 'center', fontSize: 15, fontWeight: '600' },
-  addBtn: { paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#111', borderRadius: 10 },
-  addBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
-  cartSummary: { marginTop: 20, padding: 16, backgroundColor: '#f5f5f5', borderRadius: 12 },
-  cartTitle: { fontSize: 14, color: '#666' },
-  cartTotalRow: {
-    flexDirection: 'row',
+  itemName: { fontSize: Typography.base, fontWeight: '500', color: Colors.textPrimary },
+  itemPrice: { fontSize: Typography.sm, color: Colors.textMuted, marginTop: 2 },
+  itemActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  qtyBtn: {
+    width: 32, height: 32,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.beige,
+    borderWidth: 1,
+    borderColor: Colors.border,
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 4,
+    justifyContent: 'center',
   },
-  cartTotalLabel: { fontSize: 18, fontWeight: '700' },
-  cartTotalAmount: { fontSize: 18, fontWeight: '700' },
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee' },
-  footerError: { fontSize: 12, color: '#b00020', marginBottom: 8 },
-  submitBtn: { paddingVertical: 14, borderRadius: 12, backgroundColor: '#111', alignItems: 'center' },
-  submitBtnDisabled: { opacity: 0.6 },
-  submitBtnText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  qtyBtnText: { fontSize: 18, fontWeight: '600', color: Colors.coffeeDark },
+  qtyText: { minWidth: 24, textAlign: 'center', fontSize: Typography.base, fontWeight: '700', color: Colors.textPrimary },
+  addBtn: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.coffeeDark,
+    borderRadius: Radius.md,
+  },
+  addBtnText: { fontSize: Typography.sm, fontWeight: '600', color: Colors.textInverse },
+  cartSummary: {
+    marginTop: Spacing.lg,
+    padding: Spacing.md,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.coffeeDark,
+  },
+  cartTitle: { fontSize: Typography.sm, color: Colors.textMuted },
+  cartTotalRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.xs, marginTop: 4 },
+  cartTotalLabel: { fontSize: Typography.xl, fontWeight: '700', color: Colors.textPrimary },
+  cartTotalAmount: { fontSize: Typography.xl, fontWeight: '700', color: Colors.coffeeDark },
+  footer: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    padding: Spacing.md,
+    backgroundColor: Colors.white,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  footerError: { fontSize: Typography.sm, color: Colors.error, marginBottom: Spacing.sm },
+  submitBtn: {
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.coffeeDark,
+    alignItems: 'center',
+  },
+  submitBtnDisabled: { opacity: 0.5 },
+  submitBtnText: { fontSize: Typography.lg, fontWeight: '600', color: Colors.textInverse },
 });
 
 

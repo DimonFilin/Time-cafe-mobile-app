@@ -39,6 +39,7 @@ export type MockCafeRecord = {
   regionName?: string;
   createdAt?: string;
   updatedAt?: string;
+  openingHours?: Record<string, { open?: string; close?: string; closed?: boolean }> | null;
 };
 
 export type MockMenuResponse = {
@@ -135,6 +136,15 @@ const cafes: Record<string, MockCafeRecord> = {
     regionName: 'Washington',
     createdAt: '2026-01-12T09:00:00.000Z',
     updatedAt: '2026-04-14T09:00:00.000Z',
+    openingHours: {
+      monday: { open: '08:00', close: '22:00' },
+      tuesday: { open: '08:00', close: '22:00' },
+      wednesday: { open: '08:00', close: '22:00' },
+      thursday: { open: '08:00', close: '22:00' },
+      friday: { open: '08:00', close: '23:00' },
+      saturday: { open: '09:00', close: '23:00' },
+      sunday: { open: '09:00', close: '21:00' },
+    },
   },
   'mock-cafe-kofix-moscow': {
     id: 'mock-cafe-kofix-moscow',
@@ -159,6 +169,15 @@ const cafes: Record<string, MockCafeRecord> = {
     regionName: 'Москва',
     createdAt: '2026-02-03T10:00:00.000Z',
     updatedAt: '2026-04-14T10:00:00.000Z',
+    openingHours: {
+      monday: { open: '07:30', close: '21:30' },
+      tuesday: { open: '07:30', close: '21:30' },
+      wednesday: { open: '07:30', close: '21:30' },
+      thursday: { open: '07:30', close: '21:30' },
+      friday: { open: '07:30', close: '22:00' },
+      saturday: { open: '08:30', close: '22:00' },
+      sunday: { open: '09:00', close: '21:00' },
+    },
   },
 };
 

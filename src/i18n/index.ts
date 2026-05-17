@@ -1,7 +1,10 @@
 import en from './en.json';
+import ru from './ru.json';
 
 type Dict = Record<string, any>;
-const dict: Dict = en as Dict;
+
+// Используем русский язык по умолчанию
+const dict: Dict = ru as Dict;
 
 export function t(key: string): string {
   const parts = key.split('.');

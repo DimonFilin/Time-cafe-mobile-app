@@ -44,6 +44,7 @@ export type UpdateMeInput = {
   firstName?: string;
   lastName?: string;
   phone?: string;
+  gender?: 'MALE' | 'FEMALE';
   avatar?: string;
 };
 

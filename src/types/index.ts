@@ -4,6 +4,7 @@ export interface User {
   firstName: string;
   lastName: string;
   phone?: string | null;
+  gender?: 'MALE' | 'FEMALE' | null;
   avatar?: string | null;
   balance?: string;
   createdAt: string;

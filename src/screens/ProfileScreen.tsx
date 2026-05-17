@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -11,12 +12,13 @@ import { FullscreenImageModal } from '@/components/FullscreenImageModal';
 import { MoneyAmount } from '@/components/currency/MoneyAmount';
 import { t } from '@/i18n';
 import { useAuthStore } from '@/store/authStore';
-import { formatDateTime } from '@/utils/dates';
 import { getErrorMessage } from '@/utils/errors';
 import { resolveFileUrl } from '@/utils/files';
+import { Colors, Radius, Spacing, Styles, Typography } from '@/utils/theme';
 
 export function ProfileScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const logout = useAuthStore((s) => s.logout);
   const sessionUser = useAuthStore((s) => s.user);
@@ -38,6 +40,7 @@ export function ProfileScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  const [gender, setGender] = useState<'MALE' | 'FEMALE' | ''>('');
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
   const [avatarSignedUrl, setAvatarSignedUrl] = useState<string | null>(null);
@@ -50,6 +53,7 @@ export function ProfileScreen() {
     setFirstName(user.firstName ?? '');
     setLastName(user.lastName ?? '');
     setPhone((user.phone ?? '') as string);
+    setGender((user.gender as 'MALE' | 'FEMALE' | null) ?? '');
   }, [user?.id]);
 
   useEffect(() => {
@@ -90,8 +94,9 @@ export function ProfileScreen() {
     if (firstName.trim()) p.firstName = firstName.trim();
     if (lastName.trim()) p.lastName = lastName.trim();
     if (phone.trim()) p.phone = phone.trim();
+    if (gender) p.gender = gender;
     return p;
-  }, [firstName, lastName, phone]);
+  }, [firstName, lastName, phone, gender]);
 
   const isDirty = useMemo(() => {
     if (!user) return false;
@@ -99,9 +104,10 @@ export function ProfileScreen() {
     return (
       a(firstName) !== a(user.firstName) ||
       a(lastName) !== a(user.lastName) ||
-      a(phone) !== a(user.phone as any)
+      a(phone) !== a(user.phone as any) ||
+      (gender || '') !== ((user.gender as 'MALE' | 'FEMALE' | null) ?? '')
     );
-  }, [user?.id, firstName, lastName, phone]);
+  }, [user?.id, firstName, lastName, phone, gender]);
 
   function digitsOnly(v: string) {
     return v.replace(/\D+/g, '');
@@ -155,11 +161,11 @@ export function ProfileScreen() {
 
   async function pickAndUploadAvatar() {
     if (!user?.id) return;
-    setAvatarUploadError('Opening image picker…');
+    setAvatarUploadError(t('profile.openingGallery'));
 
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      setAvatarUploadError('Media library permission is required.');
+      setAvatarUploadError(t('profile.galleryPermission'));
       return;
     }
     setAvatarUploadError(null);
@@ -195,8 +201,9 @@ export function ProfileScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.safe, { paddingTop: insets.top }]}>
+      <View style={styles.container}>
+        <View style={styles.header}>
         <Text style={styles.headerTitle}>{t('auth.profile.title')}</Text>
 
         <View style={styles.headerActions}>
@@ -207,12 +214,13 @@ export function ProfileScreen() {
               setFirstName(user.firstName ?? '');
               setLastName(user.lastName ?? '');
               setPhone((user.phone ?? '') as string);
+              setGender((user.gender as 'MALE' | 'FEMALE' | null) ?? '');
               setAvatarChanged(false);
               setEditVisible(true);
             }}
             style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}
           >
-            <Ionicons name="create-outline" size={18} color="#111" />
+            <Ionicons name="create-outline" size={18} color={Colors.coffeeDark} />
           </Pressable>
 
           <Pressable
@@ -224,7 +232,7 @@ export function ProfileScreen() {
               pressed && !meQuery.isFetching && styles.pressed,
             ]}
           >
-            <Ionicons name="refresh-outline" size={18} color="#111" />
+            <Ionicons name="refresh-outline" size={18} color={Colors.coffeeDark} />
           </Pressable>
 
           <Pressable
@@ -235,7 +243,7 @@ export function ProfileScreen() {
             }}
             style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}
           >
-            <Ionicons name="log-out-outline" size={18} color="#b00020" />
+            <Ionicons name="log-out-outline" size={18} color={Colors.error} />
           </Pressable>
         </View>
       </View>
@@ -283,20 +291,25 @@ export function ProfileScreen() {
 
       <View style={styles.card}>
         <Text style={styles.row}>
-          <Text style={styles.k}>id</Text>: {user?.id ?? '—'}
+          <Text style={styles.k}>{t('profile.email')}</Text>: {user?.email ?? '—'}
         </Text>
         <Text style={styles.row}>
-          <Text style={styles.k}>email</Text>: {user?.email ?? '—'}
+          <Text style={styles.k}>{t('profile.name')}</Text>: {(user?.firstName ?? '—')} {(user?.lastName ?? '')}
         </Text>
         <Text style={styles.row}>
-          <Text style={styles.k}>name</Text>: {(user?.firstName ?? '—')} {(user?.lastName ?? '')}
+          <Text style={styles.k}>{t('profile.phone')}</Text>: {(user?.phone as any) ?? '—'}
         </Text>
         <Text style={styles.row}>
-          <Text style={styles.k}>phone</Text>: {(user?.phone as any) ?? '—'}
+          <Text style={styles.k}>{t('profile.gender')}</Text>:{' '}
+          {user?.gender === 'MALE'
+            ? t('profile.male')
+            : user?.gender === 'FEMALE'
+              ? t('profile.female')
+              : '—'}
         </Text>
         <View style={[styles.row, { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }]}>
           <Text>
-            <Text style={styles.k}>balance</Text>:
+            <Text style={styles.k}>{t('profile.balance')}</Text>:
           </Text>
           {user?.balance != null ? (
             <MoneyAmount value={user.balance} textStyle={styles.rowValue} iconSize={14} />
@@ -304,16 +317,13 @@ export function ProfileScreen() {
             <Text style={styles.rowValue}>—</Text>
           )}
         </View>
-        <Text style={styles.row}>
-          <Text style={styles.k}>createdAt</Text>: {formatDateTime(user?.createdAt as any, 'PPpp')}
-        </Text>
       </View>
 
       <Pressable
         onPress={() => navigation.navigate('Cards')}
         style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
       >
-        <Text style={styles.secondaryBtnText}>Cards</Text>
+        <Text style={styles.secondaryBtnText}>{t('profile.cards')}</Text>
       </Pressable>
 
       
@@ -321,7 +331,7 @@ export function ProfileScreen() {
         onPress={() => navigation.navigate('Settings')}
         style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
       >
-        <Text style={styles.secondaryBtnText}>Settings</Text>
+        <Text style={styles.secondaryBtnText}>{t('profile.settings')}</Text>
       </Pressable>
 
       <Modal visible={editVisible} transparent animationType="fade" onRequestClose={() => setEditVisible(false)}>
@@ -329,61 +339,96 @@ export function ProfileScreen() {
           <Pressable style={styles.modalBackdrop} onPress={() => setEditVisible(false)} />
           <View style={styles.modalCard} pointerEvents="auto">
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit profile</Text>
+              <Text style={styles.modalTitle}>{t('profile.editProfile')}</Text>
               <Pressable
                 onPress={() => setEditVisible(false)}
                 style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}
               >
-                <Ionicons name="close-outline" size={18} color="#111" />
+                <Ionicons name="close-outline" size={18} color={Colors.textSecondary} />
               </Pressable>
             </View>
 
-            <Text style={[styles.label, { marginTop: 10 }]}>First name</Text>
-            <TextInput value={firstName} onChangeText={setFirstName} maxLength={20} style={styles.input} />
-            {firstName.trim().length > 20 ? <Text style={styles.error}>Max 20 characters</Text> : null}
-
-            <Text style={[styles.label, { marginTop: 10 }]}>Last name</Text>
-            <TextInput value={lastName} onChangeText={setLastName} maxLength={20} style={styles.input} />
-            {lastName.trim().length > 20 ? <Text style={styles.error}>Max 20 characters</Text> : null}
-
-            <Text style={[styles.label, { marginTop: 10 }]}>Phone</Text>
-            <TextInput
-              value={phoneFormatted}
-              onChangeText={(v) => setPhone(formatByPhone(v))}
-              keyboardType="phone-pad"
-              autoCapitalize="none"
-              placeholder="+375-29-333-33-33"
-              style={styles.input}
-            />
-            {!phoneValid ? <Text style={styles.error}>Phone must match +375-XX-XXX-XX-XX</Text> : null}
-            <Pressable
-              disabled={avatarUploading}
-              onPress={() => void pickAndUploadAvatar()}
-              style={({ pressed }) => [
-                styles.secondaryBtn,
-                styles.secondaryBtnCompact,
-                avatarUploading && styles.disabled,
-                pressed && !avatarUploading && styles.pressed,
-              ]}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.modalScrollContent}
             >
-              <Text style={styles.secondaryBtnText}>{avatarUploading ? 'Uploading…' : 'Upload avatar'}</Text>
-            </Pressable>
-            {avatarUploadError ? <Text style={styles.error}>{avatarUploadError}</Text> : null}
-            {avatarChanged ? <Text style={styles.hint}>Avatar updated. Tap Save to close.</Text> : null}
+              <Text style={[styles.label, { marginTop: Spacing.sm }]}>{t('profile.name')}</Text>
+              <TextInput value={firstName} onChangeText={setFirstName} maxLength={20} style={styles.input} />
+              {firstName.trim().length > 20 ? <Text style={styles.error}>{t('profile.maxLength')}</Text> : null}
 
-            {updateMutation.error ? <Text style={styles.error}>{getErrorMessage(updateMutation.error)}</Text> : null}
+              <Text style={[styles.label, { marginTop: Spacing.md }]}>{t('profile.surname')}</Text>
+              <TextInput value={lastName} onChangeText={setLastName} maxLength={20} style={styles.input} />
+              {lastName.trim().length > 20 ? <Text style={styles.error}>{t('profile.maxLength')}</Text> : null}
 
-            <Pressable
-              disabled={!canSave}
-              onPress={handleSave}
-              style={({ pressed }) => [
-                styles.primaryBtn,
-                !canSave && styles.disabled,
-                pressed && !updateMutation.isPending && !avatarUploading && styles.pressed,
-              ]}
-            >
-              <Text style={styles.primaryBtnText}>{updateMutation.isPending ? 'Saving…' : 'Save'}</Text>
-            </Pressable>
+              <Text style={[styles.label, { marginTop: Spacing.md }]}>{t('profile.phone')}</Text>
+              <TextInput
+                value={phoneFormatted}
+                onChangeText={(v) => setPhone(formatByPhone(v))}
+                keyboardType="phone-pad"
+                autoCapitalize="none"
+                placeholder="+375-29-333-33-33"
+                style={styles.input}
+              />
+              {!phoneValid ? <Text style={styles.error}>{t('profile.phoneFormat')}</Text> : null}
+
+              <Text style={[styles.label, { marginTop: Spacing.md }]}>{t('profile.gender')}</Text>
+              <View style={styles.genderRow}>
+                <Pressable
+                  onPress={() => setGender('MALE')}
+                  style={({ pressed }) => [
+                    styles.genderChip,
+                    gender === 'MALE' && styles.genderChipActive,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={[styles.genderChipText, gender === 'MALE' && styles.genderChipTextActive]}>
+                    {t('profile.male')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setGender('FEMALE')}
+                  style={({ pressed }) => [
+                    styles.genderChip,
+                    gender === 'FEMALE' && styles.genderChipActive,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={[styles.genderChipText, gender === 'FEMALE' && styles.genderChipTextActive]}>
+                    {t('profile.female')}
+                  </Text>
+                </Pressable>
+              </View>
+
+              <Pressable
+                disabled={avatarUploading}
+                onPress={() => void pickAndUploadAvatar()}
+                style={({ pressed }) => [
+                  styles.secondaryBtn,
+                  styles.secondaryBtnCompact,
+                  avatarUploading && styles.disabled,
+                  pressed && !avatarUploading && styles.pressed,
+                ]}
+              >
+                <Text style={styles.secondaryBtnText}>{avatarUploading ? t('profile.uploading') : t('profile.uploadAvatar')}</Text>
+              </Pressable>
+              {avatarUploadError ? <Text style={styles.error}>{avatarUploadError}</Text> : null}
+              {avatarChanged ? <Text style={styles.hint}>{t('profile.avatarUpdated')}</Text> : null}
+
+              {updateMutation.error ? <Text style={styles.error}>{getErrorMessage(updateMutation.error)}</Text> : null}
+
+              <Pressable
+                disabled={!canSave}
+                onPress={handleSave}
+                style={({ pressed }) => [
+                  styles.primaryBtn,
+                  !canSave && styles.disabled,
+                  pressed && !updateMutation.isPending && !avatarUploading && styles.pressed,
+                ]}
+              >
+                <Text style={styles.primaryBtnText}>{updateMutation.isPending ? t('profile.saving') : t('profile.save')}</Text>
+              </Pressable>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -395,90 +440,79 @@ export function ProfileScreen() {
           onClose={() => setAvatarFullscreenVisible(false)}
         />
       ) : null}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 16 },
+  safe: {
+    flex: 1,
+    backgroundColor: Colors.white,
+  },
+  container: { flex: 1, backgroundColor: Colors.white, padding: Spacing.lg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: Spacing.md,
   },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
+  headerTitle: { fontSize: Typography.xl, fontWeight: '700', color: Colors.textPrimary },
   headerActions: { flexDirection: 'row', gap: 6 },
-  headerIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  headerIcon: { ...Styles.headerIcon },
   avatarRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
+    backgroundColor: Colors.cream,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.md,
   },
-  avatarPressable: { borderRadius: 999, overflow: 'hidden' },
-  avatarImg: { width: 64, height: 64, borderRadius: 999, backgroundColor: '#eee' },
+  avatarPressable: { borderRadius: Radius.full, overflow: 'hidden' },
+  avatarImg: { width: 64, height: 64, borderRadius: Radius.full, backgroundColor: Colors.beige },
   avatarPlaceholder: {
     width: 64,
     height: 64,
-    borderRadius: 999,
-    backgroundColor: '#111',
+    borderRadius: Radius.full,
+    backgroundColor: Colors.coffeeDark,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarPlaceholderText: { color: '#fff', fontWeight: '800', fontSize: 22 },
+  avatarPlaceholderText: { color: Colors.textInverse, fontWeight: '800', fontSize: 22 },
   avatarMeta: { flex: 1 },
-  avatarName: { fontSize: 16, fontWeight: '700' },
-  avatarSub: { fontSize: 12, opacity: 0.65, marginTop: 2 },
-  card: { width: '100%', padding: 12, borderRadius: 12, backgroundColor: '#f5f5f5', marginBottom: 12 },
-  row: { fontSize: 13, marginBottom: 6 },
-  rowValue: { fontSize: 13, fontFamily: 'monospace' },
-  k: { fontWeight: '700' },
-  label: { fontSize: 12, opacity: 0.7, marginBottom: 6 },
-  hint: { fontSize: 12, opacity: 0.6, marginTop: 6 },
-  input: {
-    height: 44,
-    borderRadius: 12,
+  avatarName: { fontSize: Typography.lg, fontWeight: '700', color: Colors.textPrimary },
+  avatarSub: { fontSize: Typography.sm, color: Colors.textMuted, marginTop: 2 },
+  card: {
+    width: '100%',
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.cream,
     borderWidth: 1,
-    borderColor: '#ddd',
-    paddingHorizontal: 12,
-    backgroundColor: '#fff',
+    borderColor: Colors.border,
+    marginBottom: Spacing.md,
   },
-  inputDisabled: {
-    opacity: 0.7,
-  },
-  primaryBtn: {
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#111',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  primaryBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  secondaryBtn: {
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#111',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  secondaryBtnCompact: {
-    height: 40,
-    marginBottom: 0,
-    marginTop: 10,
-  },
-  secondaryBtnText: { fontSize: 14, fontWeight: '600', color: '#111' },
-  error: { color: '#b00020', marginTop: 10 },
-  pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.6 },
-
+  row: { fontSize: Typography.sm, marginBottom: 6, color: Colors.textPrimary },
+  rowValue: { fontSize: Typography.sm, fontFamily: 'monospace', color: Colors.textSecondary },
+  k: { fontWeight: '700', color: Colors.coffeeDark },
+  label: { ...Styles.label },
+  hint: { fontSize: Typography.sm, color: Colors.textMuted, marginTop: Spacing.sm },
+  input: { ...Styles.input },
+  inputDisabled: { opacity: 0.7 },
+  primaryBtn: { ...Styles.primaryBtn, marginTop: Spacing.md },
+  primaryBtnText: Styles.primaryBtnText,
+  secondaryBtn: { ...Styles.secondaryBtn, marginBottom: Spacing.md },
+  secondaryBtnCompact: { height: 40, marginBottom: 0, marginTop: Spacing.sm },
+  secondaryBtnText: Styles.secondaryBtnText,
+  error: { color: Colors.error, marginTop: Spacing.sm, fontSize: Typography.sm },
+  pressed: Styles.pressed,
+  disabled: Styles.disabled,
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
-    padding: 16,
+    padding: Spacing.lg,
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -488,18 +522,42 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    borderRadius: 16,
-    backgroundColor: '#fff',
-    padding: 12,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.white,
+    padding: Spacing.md,
+    paddingBottom: 0,
     zIndex: 2,
     elevation: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    maxHeight: '85%',
+  },
+  modalScrollContent: {
+    paddingBottom: Spacing.xxl,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: Spacing.xs,
   },
-  modalTitle: { fontSize: 16, fontWeight: '800' },
+  modalTitle: { fontSize: Typography.lg, fontWeight: '800', color: Colors.textPrimary },
+  genderRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.xs },
+  genderChip: {
+    flex: 1,
+    height: 40,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.beige,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  genderChipActive: {
+    borderColor: Colors.coffeeDark,
+    backgroundColor: Colors.coffeeDark,
+  },
+  genderChipText: { fontSize: Typography.sm, color: Colors.textSecondary, fontWeight: '600' },
+  genderChipTextActive: { color: Colors.textInverse, fontWeight: '700' },
 });
 

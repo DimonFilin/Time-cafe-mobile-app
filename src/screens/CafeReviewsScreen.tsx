@@ -7,7 +7,9 @@ import { getReviews } from '@/api/reviews';
 import { StarRating } from '@/components/StarRating';
 import { t } from '@/i18n';
 import type { CafesStackParamList } from '@/navigation/stacks';
+import { useAuthStore } from '@/store/authStore';
 import { formatDateTime } from '@/utils/dates';
+import { Colors, Radius, Spacing, Styles, Typography } from '@/utils/theme';
 
 type Props = StackScreenProps<CafesStackParamList, 'CafeReviews'>;
 
@@ -15,6 +17,7 @@ const MIN_RATING_OPTIONS = [0, 3, 4, 4.5, 5];
 
 export function CafeReviewsScreen({ navigation, route }: Props) {
   const { cafeId, cafeName } = route.params;
+  const viewerId = useAuthStore((state) => state.user?.id);
   const [minRating, setMinRating] = useState<number>(0);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
 
@@ -39,6 +42,10 @@ export function CafeReviewsScreen({ navigation, route }: Props) {
     const raw = reviewsQuery.data?.items ?? [];
     return [...raw].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   }, [reviewsQuery.data?.items]);
+  const myReview = useMemo(
+    () => items.find((item) => item.userId === viewerId),
+    [items, viewerId],
+  );
 
   return (
     <View style={styles.container}>
@@ -55,7 +62,7 @@ export function CafeReviewsScreen({ navigation, route }: Props) {
                 onPress={() => setMinRating(v)}
                 style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && styles.pressed]}
               >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{v === 0 ? 'Any' : `${v}+`}</Text>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{v === 0 ? t('common.any') : `${v}+`}</Text>
               </Pressable>
             );
           })}
@@ -66,15 +73,17 @@ export function CafeReviewsScreen({ navigation, route }: Props) {
           <Switch value={verifiedOnly} onValueChange={setVerifiedOnly} />
         </View>
 
-        <Pressable
-          onPress={() => navigation.navigate('ReviewCreate', { cafeId, cafeName })}
-          style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
-        >
-          <Text style={styles.primaryBtnText}>{t('cafes.reviews.write')}</Text>
-        </Pressable>
+        {!myReview ? (
+          <Pressable
+            onPress={() => navigation.navigate('ReviewCreate', { cafeId, cafeName })}
+            style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
+          >
+            <Text style={styles.primaryBtnText}>{t('cafes.reviews.write')}</Text>
+          </Pressable>
+        ) : null}
       </View>
 
-      {reviewsQuery.isLoading ? <Text style={styles.topText}>Loading...</Text> : null}
+      {reviewsQuery.isLoading ? <Text style={styles.topText}>{t('common.loading')}</Text> : null}
 
       <FlatList
         data={items}
@@ -86,13 +95,32 @@ export function CafeReviewsScreen({ navigation, route }: Props) {
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.row}>
-              <Text style={styles.userName}>{item.userName || 'User'}</Text>
-              <Text style={styles.date}>{formatDateTime(item.createdAt, 'PP')}</Text>
+              <Text style={styles.userName}>{item.userName || t('common.user')}</Text>
+              <View style={styles.rowRight}>
+                {item.userId === viewerId ? (
+                  <Pressable
+                    onPress={() =>
+                      navigation.navigate('ReviewCreate', {
+                        cafeId,
+                        cafeName,
+                        reviewId: item.id,
+                        initialRating: item.rating,
+                        initialComment: item.comment,
+                      })
+                    }
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.editBtn, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.editBtnIcon}>✏️</Text>
+                  </Pressable>
+                ) : null}
+                <Text style={styles.date}>{formatDateTime(item.createdAt, 'PP')}</Text>
+              </View>
             </View>
 
             <View style={styles.row}>
               <StarRating value={item.rating} />
-              {item.isVerified ? <Text style={styles.verified}>Verified</Text> : null}
+              {item.isVerified ? <Text style={styles.verified}>{t('common.verified')}</Text> : null}
             </View>
 
             {item.comment ? <Text style={styles.comment}>{item.comment}</Text> : null}
@@ -104,26 +132,54 @@ export function CafeReviewsScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  topText: { padding: 12 },
-  filtersCard: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  filtersTitle: { fontSize: 16, fontWeight: '800', marginBottom: 10 },
-  label: { fontSize: 12, opacity: 0.75, marginBottom: 6 },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  chip: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: '#ddd' },
-  chipActive: { borderColor: '#111', backgroundColor: '#111' },
-  chipText: { fontSize: 12, color: '#111' },
-  chipTextActive: { color: '#fff', fontWeight: '700' },
-  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  primaryBtn: { height: 44, borderRadius: 12, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
-  primaryBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  pressed: { opacity: 0.85 },
-  listContent: { padding: 12, paddingTop: 10, gap: 10 },
-  card: { padding: 12, borderRadius: 12, backgroundColor: '#f5f5f5' },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  userName: { fontSize: 13, fontWeight: '800' },
-  date: { fontSize: 12, opacity: 0.7 },
-  verified: { fontSize: 11, fontWeight: '800', color: '#065F46' },
-  comment: { fontSize: 13, marginTop: 6, lineHeight: 18 },
+  container: { flex: 1, backgroundColor: Colors.cream },
+  topText: { padding: Spacing.md, color: Colors.textMuted, fontSize: Typography.sm },
+  filtersCard: {
+    padding: Spacing.md,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  filtersTitle: { fontSize: Typography.lg, fontWeight: '800', color: Colors.textPrimary, marginBottom: Spacing.sm },
+  label: { ...Styles.label },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.sm },
+  chip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.beige,
+  },
+  chipActive: { borderColor: Colors.coffeeDark, backgroundColor: Colors.coffeeDark },
+  chipText: { fontSize: Typography.sm, color: Colors.textSecondary, fontWeight: '500' },
+  chipTextActive: { color: Colors.textInverse, fontWeight: '700' },
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md },
+  primaryBtn: { ...Styles.primaryBtn },
+  primaryBtnText: { ...Styles.primaryBtnText },
+  pressed: Styles.pressed,
+  listContent: { padding: Spacing.md, gap: Spacing.sm },
+  card: {
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.xs },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  userName: { fontSize: Typography.base, fontWeight: '700', color: Colors.textPrimary },
+  date: { fontSize: Typography.sm, color: Colors.textMuted },
+  editBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.beige,
+  },
+  editBtnIcon: { fontSize: 14 },
+  verified: { fontSize: Typography.xs, fontWeight: '700', color: Colors.success },
+  comment: { fontSize: Typography.base, marginTop: Spacing.xs, lineHeight: 20, color: Colors.textSecondary },
 });
 

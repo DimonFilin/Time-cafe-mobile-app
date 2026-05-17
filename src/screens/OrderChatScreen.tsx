@@ -1,6 +1,17 @@
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Image,
+  Linking,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { io, Socket } from 'socket.io-client';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -12,14 +23,18 @@ import {
   sendOrderChatMessage,
   uploadOrderChatAttachment,
 } from '@/api/order-chat';
+import { t } from '@/i18n';
+import { getSharedApiOrigin } from '@/config/urls';
 import { useAuthStore } from '@/store/authStore';
+import { resolveFileUrl } from '@/utils/files';
+import { Colors, Radius, Spacing, Typography } from '@/utils/theme';
 
 type Props = StackScreenProps<BookingsStackParamList, 'OrderChat'>;
 
-const WS_URL = process.env.EXPO_PUBLIC_SHARED_API_URL || 'http://localhost:3000';
-
 export function OrderChatScreen({ route }: Props) {
   const { orderId } = route.params;
+  const { width: windowWidth } = useWindowDimensions();
+  const attachmentThumbWidth = Math.round(windowWidth * 0.4);
   const token = useAuthStore((s) => s.accessToken);
   const user = useAuthStore((s) => s.user);
   const [chatId, setChatId] = useState<string | null>(null);
@@ -61,16 +76,21 @@ export function OrderChatScreen({ route }: Props) {
 
   useEffect(() => {
     if (!chatId || !user) return;
-    console.log('[OrderChat] connecting socket', { WS_URL, chatId, hasToken: Boolean(token) });
-    const s = io(`${WS_URL}/order-chats`, {
-      transports: ['websocket', 'polling'],
+    const base = getSharedApiOrigin();
+    console.log('[OrderChat] connecting socket', { base, chatId, hasToken: Boolean(token) });
+    const s = io(`${base}/order-chats`, {
+      // Сначала polling: через ngrok/прокси без стабильного WS чаще работает, чем «websocket» первым.
+      transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionAttempts: Infinity,
       auth: token ? { token } : undefined,
-      withCredentials: true,
+      // В React Native не браузерные cookies; true иногда ломает рукопожатие вне localhost.
+      withCredentials: false,
     });
-    s.emit('chat:join', { chatId });
-    s.on('connect', () => console.log('[OrderChat] socket connected', { id: s.id }));
+    s.on('connect', () => {
+      console.log('[OrderChat] socket connected', { id: s.id });
+      s.emit('chat:join', { chatId });
+    });
     s.on('connect_error', (err) =>
       console.error('[OrderChat] socket connect error', { message: err.message }),
     );
@@ -111,7 +131,7 @@ export function OrderChatScreen({ route }: Props) {
     }
     console.log('[OrderChat] pick images start', { remain });
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsMultipleSelection: true,
       selectionLimit: remain,
       quality: 0.9,
@@ -227,18 +247,27 @@ export function OrderChatScreen({ route }: Props) {
           >
             {m.text ? <Text style={m.authorType === 'USER' ? styles.myText : styles.otherText}>{m.text}</Text> : null}
             {!!m.attachments?.length && (
-              <View style={styles.imagesGrid}>
-                {m.attachments.slice(0, 4).map((a) => (
-                  <Pressable key={a.id} onPress={() => setPreviewImageUrl(a.url)}>
-                    <Image
-                      source={{ uri: a.url }}
-                      style={styles.chatImage}
-                      onError={() => {
-                        console.error('[OrderChat] chat image failed', { attachmentId: a.id, url: a.url });
-                      }}
-                    />
-                  </Pressable>
-                ))}
+              <View
+                style={[
+                  styles.imagesGrid,
+                  m.authorType === 'USER' ? styles.imagesGridMine : styles.imagesGridTheirs,
+                ]}
+              >
+                {m.attachments.slice(0, 4).map((a) => {
+                  const uri = resolveFileUrl(a.url) || a.url;
+                  return (
+                    <Pressable key={a.id} onPress={() => setPreviewImageUrl(uri)}>
+                      <Image
+                        source={{ uri }}
+                        style={[styles.chatImage, { width: attachmentThumbWidth }]}
+                        resizeMode="cover"
+                        onError={() => {
+                          console.error('[OrderChat] chat image failed', { attachmentId: a.id, url: uri });
+                        }}
+                      />
+                    </Pressable>
+                  );
+                })}
               </View>
             )}
           </View>
@@ -246,27 +275,31 @@ export function OrderChatScreen({ route }: Props) {
       </ScrollView>
       {isRemoteTyping ? (
         <View style={styles.typingRow}>
-          <Text style={styles.typingText}>Сотрудник печатает...</Text>
+          <Text style={styles.typingText}>{t('chat.typing')}</Text>
         </View>
       ) : null}
 
       <View style={styles.inputRow}>
-        <Pressable onPress={() => void pickImages()} style={styles.attachBtn}>
+        <Pressable
+          onPress={() => void pickImages()}
+          style={[styles.attachBtn, (!chatId || uploading) && styles.disabled]}
+          disabled={!chatId || uploading}
+        >
           <Text style={styles.attachText}>📷</Text>
         </Pressable>
         <TextInput
           value={text}
           onChangeText={setText}
           style={styles.input}
-          placeholder="Сообщение"
+          placeholder={t('chat.message')}
         />
         <Pressable onPress={() => void send()} disabled={!canSendMessage} style={[styles.sendBtn, !canSendMessage && styles.disabled]}>
-          <Text style={styles.sendText}>Send</Text>
+          <Text style={styles.sendText}>{t('chat.send')}</Text>
         </Pressable>
       </View>
       <View style={styles.attachmentsRow}>
         <Text style={styles.attachmentsText}>
-          {uploading ? 'Загрузка фото...' : `Вложений: ${attachments.length}/4`}
+          {uploading ? t('chat.uploading') : `${t('chat.attachments')}: ${attachments.length}/4`}
         </Text>
       </View>
 
@@ -279,24 +312,26 @@ export function OrderChatScreen({ route }: Props) {
         <Pressable style={styles.previewOverlay} onPress={() => setPreviewImageUrl(null)}>
           <Pressable style={styles.previewCard} onPress={() => {}}>
             {previewImageUrl ? (
-              <Image
-                source={{ uri: previewImageUrl }}
-                style={styles.previewImage}
-                resizeMode="contain"
-                onError={() => {
-                  console.error('[OrderChat] preview image failed', { url: previewImageUrl });
-                }}
-              />
+              <View style={styles.previewFrame}>
+                <Image
+                  source={{ uri: resolveFileUrl(previewImageUrl) || previewImageUrl }}
+                  style={styles.previewImage}
+                  resizeMode="contain"
+                  onError={() => {
+                    console.error('[OrderChat] preview image failed', { url: previewImageUrl });
+                  }}
+                />
+                <Pressable
+                  style={styles.downloadBtn}
+                  onPress={() => {
+                    if (!previewImageUrl) return;
+                    void Linking.openURL(previewImageUrl);
+                  }}
+                >
+                  <Text style={styles.downloadBtnText}>{t('chat.download')}</Text>
+                </Pressable>
+              </View>
             ) : null}
-            <Pressable
-              style={styles.downloadBtn}
-              onPress={() => {
-                if (!previewImageUrl) return;
-                void Linking.openURL(previewImageUrl);
-              }}
-            >
-              <Text style={styles.downloadBtnText}>Скачать</Text>
-            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -306,60 +341,118 @@ export function OrderChatScreen({ route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  messagesContent: { padding: 12, gap: 8 },
-  bubble: { maxWidth: '82%', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8 },
-  myBubble: { alignSelf: 'flex-end', backgroundColor: '#16a34a' },
-  otherBubble: { alignSelf: 'flex-start', backgroundColor: '#f3f4f6' },
-  myText: { color: '#fff' },
-  otherText: { color: '#111827' },
-  inputRow: { flexDirection: 'row', alignItems: 'center', padding: 10, borderTopWidth: 1, borderTopColor: '#e5e7eb', gap: 8 },
-  attachBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6' },
-  attachText: { fontSize: 16 },
-  input: { flex: 1, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-  sendBtn: { backgroundColor: '#16a34a', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
-  sendText: { color: '#fff', fontWeight: '700' },
-  disabled: { opacity: 0.5 },
-  attachmentsRow: { paddingHorizontal: 12, paddingBottom: 8 },
-  attachmentsText: { fontSize: 12, color: '#6b7280' },
-  typingRow: { paddingHorizontal: 14, paddingBottom: 6 },
-  typingText: { color: '#6b7280', fontSize: 12, fontStyle: 'italic' },
-  imagesGrid: { marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chatImage: { width: 82, height: 82, borderRadius: 8 },
-  previewOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+  container: { flex: 1, backgroundColor: Colors.cream },
+  messagesContent: { padding: Spacing.md, gap: Spacing.sm, paddingBottom: Spacing.lg },
+  bubble: {
+    maxWidth: '92%',
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  myBubble: { alignSelf: 'flex-end', backgroundColor: Colors.coffeeDark },
+  otherBubble: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  myText: { color: Colors.textInverse, fontSize: Typography.base },
+  otherText: { color: Colors.textPrimary, fontSize: Typography.base },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    backgroundColor: Colors.white,
+    gap: Spacing.sm,
+  },
+  attachBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    backgroundColor: Colors.beige,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  previewCard: {
-    width: '100%',
-    maxWidth: 420,
-    borderRadius: 16,
-    overflow: 'visible',
+  attachText: { fontSize: 18 },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.beige,
+    fontSize: Typography.base,
+    color: Colors.textPrimary,
+    maxHeight: 100,
   },
-  previewImage: {
+  sendBtn: {
+    backgroundColor: Colors.coffeeDark,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    minWidth: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendText: { color: Colors.textInverse, fontWeight: '700', fontSize: Typography.sm },
+  disabled: { opacity: 0.5 },
+  attachmentsRow: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.sm,
+    backgroundColor: Colors.white,
+  },
+  attachmentsText: { fontSize: Typography.xs, color: Colors.textMuted },
+  typingRow: { paddingHorizontal: Spacing.md, paddingBottom: Spacing.xs, backgroundColor: Colors.white },
+  typingText: { color: Colors.textMuted, fontSize: Typography.xs, fontStyle: 'italic' },
+  imagesGrid: {
+    marginTop: Spacing.sm,
+    flexDirection: 'column',
+    gap: Spacing.sm,
+  },
+  imagesGridMine: {
+    alignSelf: 'flex-end',
+    alignItems: 'flex-end',
+  },
+  imagesGridTheirs: {
+    alignSelf: 'flex-start',
+    alignItems: 'flex-start',
+  },
+  chatImage: {
+    aspectRatio: 4 / 3,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.beige,
+  },
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.lg,
+  },
+  previewCard: { width: '100%', maxWidth: 420 },
+  previewFrame: {
     width: '100%',
-    height: 420,
-    borderRadius: 16,
+    position: 'relative',
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
     backgroundColor: '#000',
   },
+  previewImage: { width: '100%', height: 420 },
   downloadBtn: {
     position: 'absolute',
-    right: 12,
-    bottom: -14,
-    backgroundColor: '#16a34a',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
+    right: Spacing.md,
+    bottom: Spacing.md,
+    backgroundColor: Colors.coffeeDark,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
   },
-  downloadBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
+  downloadBtnText: { color: Colors.textInverse, fontWeight: '700', fontSize: Typography.sm },
 });

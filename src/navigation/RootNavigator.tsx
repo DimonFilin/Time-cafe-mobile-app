@@ -31,8 +31,8 @@ export function RootNavigator() {
         <Stack.Screen name="App" component={AppTabs} options={{ headerShown: false }} />
       ) : (
         <>
-          <Stack.Screen name="Login" component={LoginScreen} options={{ title: t('auth.login.title') }} />
-          <Stack.Screen name="Register" component={RegisterScreen} options={{ title: t('auth.register.title') }} />
+          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
         </>
       )}
 
@@ -41,8 +41,8 @@ export function RootNavigator() {
         component={BookingCreateScreen}
         options={{ title: t('appointments.createTitle') }}
       />
-      <Stack.Screen name="Cards" component={CardsScreen} options={{ title: 'Cards' }} />
-      <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+      <Stack.Screen name="Cards" component={CardsScreen} options={{ title: t('cards.title') }} />
+      <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t('profile.settings') }} />
       <Stack.Screen name="Debug" component={DebugScreen} options={{ title: t('debug.title') }} />
     </Stack.Navigator>
   );

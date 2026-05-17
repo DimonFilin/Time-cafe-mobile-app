@@ -9,52 +9,41 @@ import { getMyAppointments } from '@/api/appointments';
 import { t } from '@/i18n';
 import type { BookingsStackParamList } from '@/navigation/stacks';
 import { formatDateTime } from '@/utils/dates';
+import { Colors, Radius, Spacing, Styles, Typography } from '@/utils/theme';
 
 type Props = StackScreenProps<BookingsStackParamList, 'BookingsList'>;
 
-type Filters = {
-  statuses?: AppointmentStatus[];
-  from?: string;
-  to?: string;
-};
+type Filters = { statuses?: AppointmentStatus[]; from?: string; to?: string };
 
 const STATUS_OPTIONS: AppointmentStatus[] = ['pending', 'confirmed', 'cancelled', 'completed'];
 const STATUS_PRIORITY: Record<AppointmentStatus, number> = {
-  confirmed: 0,
-  pending: 1,
-  completed: 2,
-  cancelled: 3,
+  confirmed: 0, pending: 1, completed: 2, cancelled: 3,
 };
 
-function getStatusColors(status: AppointmentStatus) {
+function getStatusStyle(status: AppointmentStatus) {
   switch (status) {
-    case 'confirmed':
-      return { bg: '#D1FAE5', text: '#065F46' };
-    case 'pending':
-      return { bg: '#FEF3C7', text: '#92400E' };
-    case 'completed':
-      return { bg: '#DBEAFE', text: '#1E40AF' };
-    case 'cancelled':
-      return { bg: '#FEE2E2', text: '#991B1B' };
+    case 'confirmed': return { bg: Colors.successBg, text: Colors.success };
+    case 'pending':   return { bg: Colors.warningBg, text: Colors.warning };
+    case 'completed': return { bg: Colors.infoBg,    text: Colors.info };
+    case 'cancelled': return { bg: Colors.errorBg,   text: Colors.error };
   }
 }
 
+const STATUS_ICONS: Record<AppointmentStatus, string> = {
+  confirmed: '✓', pending: '⏳', completed: '✔', cancelled: '✕',
+};
+
 export function BookingsScreen({ navigation }: Props) {
   const [modalVisible, setModalVisible] = useState(false);
-
   const [draft, setDraft] = useState<Filters>({ statuses: [], from: '', to: '' });
   const [applied, setApplied] = useState<Filters>({ statuses: [] });
 
-  const queryParams = useMemo(
-    () => ({
-      page: 1,
-      limit: 20,
-      status: applied.statuses && applied.statuses.length === 1 ? applied.statuses[0] : undefined,
-      from: applied.from?.trim() || undefined,
-      to: applied.to?.trim() || undefined,
-    }),
-    [applied]
-  );
+  const queryParams = useMemo(() => ({
+    page: 1, limit: 20,
+    status: applied.statuses?.length === 1 ? applied.statuses[0] : undefined,
+    from: applied.from?.trim() || undefined,
+    to: applied.to?.trim() || undefined,
+  }), [applied]);
 
   const bookingsQuery = useQuery({
     queryKey: ['appointments', queryParams],
@@ -63,12 +52,14 @@ export function BookingsScreen({ navigation }: Props) {
   });
 
   useLayoutEffect(() => {
-    const open = () => setModalVisible(true);
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerActions}>
-          <Pressable onPress={open} style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}>
-            <Ionicons name="filter-outline" size={18} color="#111" />
+          <Pressable
+            onPress={() => setModalVisible(true)}
+            style={({ pressed }) => [Styles.headerIcon, pressed && Styles.pressed]}
+          >
+            <Ionicons name="filter-outline" size={18} color={Colors.coffeeDark} />
           </Pressable>
         </View>
       ),
@@ -76,14 +67,9 @@ export function BookingsScreen({ navigation }: Props) {
   }, [navigation]);
 
   const apply = () => {
-    setApplied({
-      statuses: draft.statuses ?? [],
-      from: draft.from?.trim() || undefined,
-      to: draft.to?.trim() || undefined,
-    });
+    setApplied({ statuses: draft.statuses ?? [], from: draft.from?.trim() || undefined, to: draft.to?.trim() || undefined });
     setModalVisible(false);
   };
-
   const reset = () => {
     setDraft({ statuses: [], from: '', to: '' });
     setApplied({ statuses: [] });
@@ -94,101 +80,101 @@ export function BookingsScreen({ navigation }: Props) {
     const raw = bookingsQuery.data?.items ?? [];
     const statuses = applied.statuses ?? [];
     const filtered = statuses.length ? raw.filter((x) => statuses.includes(x.status)) : raw;
-
     return [...filtered].sort((a, b) => {
-      const pa = STATUS_PRIORITY[a.status];
-      const pb = STATUS_PRIORITY[b.status];
+      const pa = STATUS_PRIORITY[a.status], pb = STATUS_PRIORITY[b.status];
       if (pa !== pb) return pa - pb;
-
-      const ta = Date.parse(a.dateTime);
-      const tb = Date.parse(b.dateTime);
+      const ta = Date.parse(a.dateTime), tb = Date.parse(b.dateTime);
       const active = a.status === 'confirmed' || a.status === 'pending';
-      if (Number.isFinite(ta) && Number.isFinite(tb)) {
-        return active ? ta - tb : tb - ta;
-      }
-      return 0;
+      return Number.isFinite(ta) && Number.isFinite(tb) ? (active ? ta - tb : tb - ta) : 0;
     });
   }, [bookingsQuery.data?.items, applied.statuses]);
 
+  const hasActiveFilters = (applied.statuses?.length ?? 0) > 0 || !!applied.from || !!applied.to;
+
   return (
     <View style={styles.container}>
-      {bookingsQuery.isLoading ? <Text style={styles.topText}>{t('appointments.loading')}</Text> : null}
+      {hasActiveFilters && (
+        <View style={styles.activeFilterBanner}>
+          <Text style={styles.activeFilterText}>
+            {t('appointments.filtersActive') ?? 'Фильтры активны'}
+          </Text>
+          <Pressable onPress={reset}>
+            <Text style={styles.activeFilterClear}>{t('appointments.reset')}</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {bookingsQuery.isLoading ? (
+        <View style={styles.centerMsg}>
+          <Text style={styles.centerMsgText}>{t('appointments.loading')}</Text>
+        </View>
+      ) : null}
 
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
+            <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>{t('appointments.filtersTitle')}</Text>
 
-            <Text style={styles.label}>{t('appointments.status')}</Text>
+            <Text style={Styles.label}>{t('appointments.status')}</Text>
             <View style={styles.chipsRow}>
               <Pressable
                 onPress={() => setDraft((s) => ({ ...s, statuses: [] }))}
                 style={({ pressed }) => [
                   styles.chip,
-                  (!draft.statuses || draft.statuses.length === 0) && styles.chipActive,
-                  pressed && styles.pressed,
+                  (!draft.statuses?.length) && styles.chipActive,
+                  pressed && Styles.pressed,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.chipText,
-                    (!draft.statuses || draft.statuses.length === 0) && styles.chipTextActive,
-                  ]}
-                >
-                  All
+                <Text style={[styles.chipText, (!draft.statuses?.length) && styles.chipTextActive]}>
+                  {t('appointments.allStatuses')}
                 </Text>
               </Pressable>
-
               {STATUS_OPTIONS.map((opt) => {
                 const selected = (draft.statuses ?? []).includes(opt);
-                const label = t(`appointments.status_${opt}`);
                 return (
                   <Pressable
                     key={opt}
-                    onPress={() =>
-                      setDraft((s) => {
-                        const cur = s.statuses ?? [];
-                        return selected
-                          ? { ...s, statuses: cur.filter((x) => x !== opt) }
-                          : { ...s, statuses: [...cur, opt] };
-                      })
-                    }
-                    style={({ pressed }) => [
-                      styles.chip,
-                      selected && styles.chipActive,
-                      pressed && styles.pressed,
-                    ]}
+                    onPress={() => setDraft((s) => {
+                      const cur = s.statuses ?? [];
+                      return { ...s, statuses: selected ? cur.filter((x) => x !== opt) : [...cur, opt] };
+                    })}
+                    style={({ pressed }) => [styles.chip, selected && styles.chipActive, pressed && Styles.pressed]}
                   >
-                    <Text style={[styles.chipText, selected && styles.chipTextActive]}>{label}</Text>
+                    <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                      {t(`appointments.status_${opt}`)}
+                    </Text>
                   </Pressable>
                 );
               })}
             </View>
 
-            <Text style={styles.label}>{t('appointments.from')}</Text>
+            <Text style={Styles.label}>{t('appointments.from')}</Text>
             <TextInput
               value={draft.from ?? ''}
               onChangeText={(v) => setDraft((s) => ({ ...s, from: v }))}
               autoCapitalize="none"
               placeholder="2025-01-01T00:00:00.000Z"
-              style={styles.input}
+              style={[Styles.input, styles.filterInput]}
+              placeholderTextColor={Colors.textMuted}
             />
 
-            <Text style={styles.label}>{t('appointments.to')}</Text>
+            <Text style={[Styles.label, { marginTop: Spacing.sm }]}>{t('appointments.to')}</Text>
             <TextInput
               value={draft.to ?? ''}
               onChangeText={(v) => setDraft((s) => ({ ...s, to: v }))}
               autoCapitalize="none"
               placeholder="2025-01-31T23:59:59.999Z"
-              style={styles.input}
+              style={[Styles.input, styles.filterInput]}
+              placeholderTextColor={Colors.textMuted}
             />
 
             <View style={styles.modalButtonsRow}>
-              <Pressable onPress={reset} style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}>
-                <Text style={styles.secondaryBtnText}>{t('appointments.reset')}</Text>
+              <Pressable onPress={reset} style={({ pressed }) => [Styles.secondaryBtn, styles.modalBtn, pressed && Styles.pressed]}>
+                <Text style={Styles.secondaryBtnText}>{t('appointments.reset')}</Text>
               </Pressable>
-              <Pressable onPress={apply} style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}>
-                <Text style={styles.primaryBtnText}>{t('appointments.apply')}</Text>
+              <Pressable onPress={apply} style={({ pressed }) => [Styles.primaryBtn, styles.modalBtn, pressed && Styles.pressed]}>
+                <Text style={Styles.primaryBtnText}>{t('appointments.apply')}</Text>
               </Pressable>
             </View>
           </View>
@@ -200,66 +186,120 @@ export function BookingsScreen({ navigation }: Props) {
         keyExtractor={(item) => item.id}
         refreshing={bookingsQuery.isFetching}
         onRefresh={() => bookingsQuery.refetch()}
-        ListEmptyComponent={!bookingsQuery.isLoading ? <Text style={styles.topText}>{t('appointments.empty')}</Text> : null}
-        renderItem={({ item }) => (
-          <View style={styles.item}>
+        contentContainerStyle={items.length === 0 ? styles.emptyContainer : styles.listContent}
+        ListEmptyComponent={
+          !bookingsQuery.isLoading ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>📅</Text>
+              <Text style={styles.emptyTitle}>{t('appointments.empty')}</Text>
+              <Text style={styles.emptySubtitle}>{t('appointments.emptyHint') ?? 'Забронируйте столик в кафе'}</Text>
+            </View>
+          ) : null
+        }
+        renderItem={({ item }) => {
+          const s = getStatusStyle(item.status);
+          return (
             <Pressable
               onPress={() => navigation.navigate('BookingDetails', { id: item.id, title: item.cafeName ?? item.id })}
-              style={({ pressed }) => [pressed && styles.itemPressed]}
+              style={({ pressed }) => [styles.item, pressed && Styles.pressed]}
             >
-              <View style={styles.itemTopRow}>
-                <Text style={styles.itemTitle} numberOfLines={1}>
-                  {item.cafeName ?? 'Cafe'}
+              <View style={[styles.itemAccent, { backgroundColor: s.text }]} />
+              <View style={styles.itemBody}>
+                <View style={styles.itemTopRow}>
+                  <Text style={styles.itemTitle} numberOfLines={1}>{item.cafeName ?? 'Cafe'}</Text>
+                  <View style={[styles.statusPill, { backgroundColor: s.bg }]}>
+                    <Text style={[styles.statusText, { color: s.text }]}>
+                      {STATUS_ICONS[item.status]} {t(`appointments.status_${item.status}`)}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.itemSub}>
+                  {formatDateTime(item.dateTime)} · {item.duration} мин
                 </Text>
-                {(() => {
-                  const c = getStatusColors(item.status);
-                  return (
-                    <View style={[styles.statusPill, { backgroundColor: c.bg }]}>
-                      <Text style={[styles.statusText, { color: c.text }]}>
-                        {t(`appointments.status_${item.status}`)}
-                      </Text>
-                    </View>
-                  );
-                })()}
               </View>
-              <Text style={styles.itemSub}>
-                {formatDateTime(item.dateTime)} • {item.duration}m
-              </Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
             </Pressable>
-          </View>
-        )}
+          );
+        }}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  topText: { padding: 12 },
-  headerActions: { flexDirection: 'row', gap: 6, paddingRight: 8 },
-  headerIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  item: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  itemPressed: { opacity: 0.8 },
-  itemTopRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  itemTitle: { flex: 1, fontSize: 14, fontWeight: '700', marginBottom: 2 },
-  statusPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: '#111' },
-  statusText: { fontSize: 11, fontWeight: '700' },
-  itemSub: { fontSize: 12, opacity: 0.7 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#fff', padding: 16, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
-  modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
-  label: { fontSize: 12, opacity: 0.7, marginBottom: 6 },
-  input: { height: 44, borderRadius: 12, borderWidth: 1, borderColor: '#ddd', paddingHorizontal: 12, marginBottom: 10 },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  chip: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: '#ddd' },
-  chipActive: { borderColor: '#111', backgroundColor: '#111' },
-  chipText: { fontSize: 12, color: '#111' },
-  chipTextActive: { color: '#fff', fontWeight: '700' },
-  modalButtonsRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
-  secondaryBtn: { flex: 1, height: 44, borderRadius: 12, borderWidth: 1, borderColor: '#111', alignItems: 'center', justifyContent: 'center' },
-  secondaryBtnText: { fontSize: 14, fontWeight: '600', color: '#111' },
-  primaryBtn: { flex: 1, height: 44, borderRadius: 12, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
-  primaryBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
-  pressed: { opacity: 0.85 }
+  container: { flex: 1, backgroundColor: Colors.cream },
+  headerActions: { flexDirection: 'row', gap: 6, paddingRight: Spacing.sm },
+  activeFilterBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.coffeeDark,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
+  activeFilterText: { color: Colors.textInverse, fontSize: Typography.sm },
+  activeFilterClear: { color: Colors.coffeLight, fontSize: Typography.sm, fontWeight: '700' },
+  centerMsg: { padding: Spacing.lg, alignItems: 'center' },
+  centerMsgText: { color: Colors.textMuted, fontSize: Typography.base },
+  listContent: { padding: Spacing.md, gap: Spacing.sm },
+  emptyContainer: { flex: 1 },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xxl },
+  emptyIcon: { fontSize: 48, marginBottom: Spacing.md },
+  emptyTitle: { fontSize: Typography.lg, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
+  emptySubtitle: { fontSize: Typography.base, color: Colors.textMuted, marginTop: Spacing.xs, textAlign: 'center' },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+  },
+  itemAccent: { width: 4, alignSelf: 'stretch' },
+  itemBody: { flex: 1, padding: Spacing.md },
+  itemTopRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: 4 },
+  itemTitle: { flex: 1, fontSize: Typography.base, fontWeight: '700', color: Colors.textPrimary },
+  statusPill: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
+  },
+  statusText: { fontSize: Typography.xs, fontWeight: '700' },
+  itemSub: { fontSize: Typography.sm, color: Colors.textMuted },
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalCard: {
+    backgroundColor: Colors.white,
+    padding: Spacing.lg,
+    paddingTop: Spacing.md,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    borderTopWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.border,
+    alignSelf: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalTitle: { fontSize: Typography.lg, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md },
+  chip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.beige,
+  },
+  chipActive: { borderColor: Colors.coffeeDark, backgroundColor: Colors.coffeeDark },
+  chipText: { fontSize: Typography.sm, color: Colors.textSecondary, fontWeight: '500' },
+  chipTextActive: { color: Colors.textInverse, fontWeight: '700' },
+  filterInput: { marginBottom: 0 },
+  modalButtonsRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.lg },
+  modalBtn: { flex: 1 },
 });
-

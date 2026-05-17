@@ -39,7 +39,7 @@ export function MoneyAmount({
   return (
     <View style={[{ flexDirection: 'row', alignItems: 'center', gap }, style]}>
       <BelarussianRubelIcon size={iconSize} color={iconColor} />
-      <Text style={textStyle} accessibilityLabel={`BYN ${text}`}>
+      <Text style={textStyle} accessibilityLabel={`${text} белорусских рублей`}>
         {text}
       </Text>
     </View>

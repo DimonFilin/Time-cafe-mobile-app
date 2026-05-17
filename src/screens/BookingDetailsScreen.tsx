@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
+import { Ionicons } from '@expo/vector-icons';
 
 import { cancelAppointment, getAppointmentById } from '@/api/appointments';
 import { getMyOrders } from '@/api/orders';
@@ -15,28 +16,37 @@ import { useAuthStore } from '@/store/authStore';
 import { buildAppointmentQrPayload } from '@/utils/appointmentQr';
 import { formatDateTime } from '@/utils/dates';
 import { getErrorMessage } from '@/utils/errors';
+import { Colors, Radius, Spacing, Styles, Typography } from '@/utils/theme';
 
 type Props = StackScreenProps<BookingsStackParamList, 'BookingDetails'>;
+type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
 
-function getStatusColors(status: 'pending' | 'confirmed' | 'completed' | 'cancelled') {
+function getStatusStyle(status: BookingStatus) {
   switch (status) {
-    case 'confirmed':
-      return { bg: '#D1FAE5', text: '#065F46' };
-    case 'pending':
-      return { bg: '#FEF3C7', text: '#92400E' };
-    case 'completed':
-      return { bg: '#DBEAFE', text: '#1E40AF' };
-    case 'cancelled':
-      return { bg: '#FEE2E2', text: '#991B1B' };
+    case 'confirmed': return { bg: Colors.successBg, text: Colors.success, icon: '✓' };
+    case 'pending':   return { bg: Colors.warningBg, text: Colors.warning, icon: '⏳' };
+    case 'completed': return { bg: Colors.infoBg,    text: Colors.info,    icon: '✔' };
+    case 'cancelled': return { bg: Colors.errorBg,   text: Colors.error,   icon: '✕' };
   }
 }
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
-  PENDING: 'Ожидает',
-  CONFIRMED: 'Подтверждён',
-  COMPLETED: 'Завершён',
-  CANCELLED: 'Отменён',
+  PENDING: 'Ожидает', CONFIRMED: 'Подтверждён', COMPLETED: 'Завершён', CANCELLED: 'Отменён',
 };
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={infoStyles.row}>
+      <Text style={infoStyles.label}>{label}</Text>
+      <Text style={infoStyles.value}>{value}</Text>
+    </View>
+  );
+}
+const infoStyles = StyleSheet.create({
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  label: { fontSize: Typography.sm, color: Colors.textMuted, flex: 1 },
+  value: { fontSize: Typography.sm, fontWeight: '600', color: Colors.textPrimary, flex: 2, textAlign: 'right' },
+});
 
 export function BookingDetailsScreen({ route, navigation }: Props) {
   const { id } = route.params;
@@ -45,7 +55,7 @@ export function BookingDetailsScreen({ route, navigation }: Props) {
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [qrVisible, setQrVisible] = useState(false);
-  const [chatEnabled, setChatEnabled] = useState<boolean>(true);
+  const [chatEnabled, setChatEnabled] = useState(true);
   const [chatCheckLoading, setChatCheckLoading] = useState(false);
 
   const bookingQuery = useQuery({
@@ -62,13 +72,9 @@ export function BookingDetailsScreen({ route, navigation }: Props) {
 
   const booking = bookingQuery.data;
   const orders = ordersQuery.data?.items ?? [];
-  useEffect(() => {
-    if (booking) {
-      console.log('[BookingDetails] booking payload', booking);
-    }
-  }, [booking]);
+  const firstOrderId = orders[0]?.id;
   const canCancel = booking?.status === 'pending' || booking?.status === 'confirmed';
-  const canOrder = booking?.status === 'pending' || booking?.status === 'confirmed';
+  const canOrder  = booking?.status === 'pending' || booking?.status === 'confirmed';
 
   const cancelMutation = useMutation({
     mutationFn: cancelAppointment,
@@ -81,293 +87,377 @@ export function BookingDetailsScreen({ route, navigation }: Props) {
     },
   });
 
-  const meta = useMemo(() => {
-    if (!booking) return null;
-    return `${t(`appointments.status_${booking.status}`)} • ${formatDateTime(booking.dateTime)} • ${booking.duration}m`;
-  }, [booking?.status, booking?.dateTime, booking?.duration]);
-
   useEffect(() => {
-    const loadChatEnabled = async () => {
+    if (!ordersQuery.isFetched) return;
+
+    const load = async () => {
+      if (!firstOrderId) {
+        setChatEnabled(false);
+        setChatCheckLoading(false);
+        return;
+      }
       try {
         setChatCheckLoading(true);
-        // Try booking id first; backend resolves order by id or by appointmentId fallback.
-        const chat = await getOrderChatByOrder(id);
+        const chat = await getOrderChatByOrder(firstOrderId);
         setChatEnabled(chat.isEnabled !== false);
       } catch {
-        // Keep default enabled when chat metadata cannot be resolved yet
         setChatEnabled(true);
       } finally {
         setChatCheckLoading(false);
       }
     };
-    void loadChatEnabled();
-  }, [id]);
+    void load();
+  }, [ordersQuery.isFetched, firstOrderId]);
 
   const qrValue = useMemo(() => {
     if (!booking) return '';
     return buildAppointmentQrPayload({ appointment: booking, viewer });
   }, [booking, viewer]);
 
+  if (bookingQuery.isLoading) {
+    return (
+      <View style={styles.loadingWrap}>
+        <Text style={styles.loadingText}>{t('common.loading')}</Text>
+      </View>
+    );
+  }
+
+  if (!booking) return null;
+
+  const statusStyle = getStatusStyle(booking.status);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>{t('appointments.detailsTitle')}</Text>
-      {bookingQuery.isLoading ? <Text>Loading...</Text> : null}
 
-      {booking ? (
-        <>
-          <View style={styles.card}>
-            <View style={styles.headerRow}>
-              <Text style={styles.h1}>{booking.cafeName ?? 'Cafe'}</Text>
-              {(() => {
-                const c = getStatusColors(booking.status);
-                return (
-                  <View style={[styles.statusPill, { backgroundColor: c.bg }]}>
-                    <Text style={[styles.statusText, { color: c.text }]}>
-                      {t(`appointments.status_${booking.status}`)}
-                    </Text>
-                  </View>
-                );
-              })()}
-            </View>
-            {meta ? <Text style={styles.meta}>{formatDateTime(booking.dateTime)} • {booking.duration}m</Text> : null}
-
-            {booking.totalAmount ? (
-              <View style={styles.kvRow}>
-                <Text style={styles.k}>totalAmount</Text>
-                <MoneyAmount value={booking.totalAmount} textStyle={styles.v} iconSize={13} />
-              </View>
-            ) : null}
-
-            {booking.notes ? (
-              <>
-                <Text style={[styles.k, { marginTop: 10 }]}>notes</Text>
-                <Text style={styles.vInline}>{booking.notes}</Text>
-              </>
-            ) : null}
-
+      {/* ── Status hero card ── */}
+      <View style={[styles.heroCard, { borderLeftColor: statusStyle.text }]}>
+        <View style={styles.heroTop}>
+          <View style={styles.heroLeft}>
+            <Text style={styles.cafeName}>{booking.cafeName ?? 'Cafe'}</Text>
+            <Text style={styles.heroDate}>{formatDateTime(booking.dateTime)}</Text>
+            <Text style={styles.heroDuration}>{booking.duration} мин</Text>
           </View>
+          <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+            <Text style={[styles.statusText, { color: statusStyle.text }]}>
+              {statusStyle.icon} {t(`appointments.status_${booking.status}`)}
+            </Text>
+          </View>
+        </View>
+        {booking.totalAmount ? (
+          <View style={styles.amountRow}>
+            <Text style={styles.amountLabel}>{t('appointments.totalAmount') ?? 'Итого'}</Text>
+            <MoneyAmount value={booking.totalAmount} textStyle={styles.amountValue} iconSize={14} />
+          </View>
+        ) : null}
+        {booking.notes ? (
+          <View style={styles.notesRow}>
+            <Ionicons name="document-text-outline" size={14} color={Colors.textMuted} />
+            <Text style={styles.notesText}>{booking.notes}</Text>
+          </View>
+        ) : null}
+        {booking.roomName ? (
+          <View style={styles.notesRow}>
+            <Ionicons name="home-outline" size={14} color={Colors.textMuted} />
+            <Text style={styles.notesText}>{`Комната: ${booking.roomName}`}</Text>
+          </View>
+        ) : null}
+      </View>
 
+      {/* ── QR code ── */}
+      <Pressable
+        onPress={() => setQrVisible(true)}
+        style={({ pressed }) => [styles.qrCard, pressed && Styles.pressed]}
+      >
+        <View style={styles.qrInner}>
+          <QRCode value={qrValue || ' '} size={130} />
+          <View pointerEvents="none" style={styles.qrBadge}>
+            <Image source={require('../../assets/favicon.png')} style={styles.qrLogo} />
+          </View>
+        </View>
+        <View style={styles.qrHint}>
+          <Ionicons name="expand-outline" size={14} color={Colors.textMuted} />
+          <Text style={styles.qrHintText}>{'Нажмите для увеличения'}</Text>
+        </View>
+      </Pressable>
+
+      {/* ── Actions ── */}
+      <View style={styles.actionsRow}>
+        {canOrder && (
           <Pressable
-            onPress={() => setQrVisible(true)}
-            style={({ pressed }) => [styles.qrCard, pressed && styles.pressed]}
+            onPress={() => navigation.navigate('OrderFromBooking', {
+              appointmentId: booking.id,
+              cafeId: booking.cafeId,
+              cafeName: booking.cafeName ?? undefined,
+            })}
+            style={({ pressed }) => [Styles.primaryBtn, styles.actionBtn, pressed && Styles.pressed]}
           >
-            <View style={styles.qrPreview}>
-              <QRCode value={qrValue} size={140} />
-              <View pointerEvents="none" style={styles.qrCenterBadge}>
-                <Image source={require('../../assets/favicon.png')} style={styles.qrCenterLogo} />
-              </View>
-            </View>
-          </Pressable>
-
-          {canOrder ? (
-            <Pressable
-              onPress={() =>
-                navigation.navigate('OrderFromBooking', {
-                  appointmentId: booking.id,
-                  cafeId: booking.cafeId,
-                  cafeName: booking.cafeName ?? undefined,
-                })
-              }
-              style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
-            >
-              <Text style={styles.primaryBtnText}>
-                {orders.length > 0 ? 'Дозаказать' : 'Заказать'}
-              </Text>
-            </Pressable>
-          ) : null}
-
-          <Pressable
-            disabled={!chatEnabled || chatCheckLoading}
-            onPress={() => {
-              navigation.navigate('OrderChat', {
-                orderId: id,
-                cafeName: booking.cafeName ?? undefined,
-              });
-            }}
-            style={({ pressed }) => [
-              styles.chatBtn,
-              (!chatEnabled || chatCheckLoading) && styles.disabled,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={styles.chatBtnText}>
-              {chatCheckLoading
-                ? 'Проверка чата...'
-                : !chatEnabled
-                  ? 'Чат отключен в кафе'
-                  : 'Связаться с сотрудниками'}
+            <Ionicons name="restaurant-outline" size={16} color={Colors.textInverse} style={styles.btnIcon} />
+            <Text style={[Styles.primaryBtnText, styles.actionBtnText]}>
+              {orders.length > 0 ? t('orders.reorder') : t('orders.order')}
             </Text>
           </Pressable>
+        )}
 
-          {orders.length > 0 ? (
-            <View style={styles.ordersCard}>
-              <Text style={styles.ordersTitle}>Мои заказы</Text>
-              {orders.map((o) => (
-                <Pressable
-                  key={o.id}
-                  style={styles.orderRow}
-                  onPress={() =>
-                    navigation.navigate('OrderChat', {
-                      orderId: o.id,
-                      cafeName: booking.cafeName ?? undefined,
-                    })
-                  }
-                >
-                  <Text style={styles.orderNumber}>#{o.orderNumber}</Text>
-                  <Text style={styles.orderStatus}>{ORDER_STATUS_LABELS[o.status] ?? o.status}</Text>
-                  <MoneyAmount
-                    value={o.totalAmount}
-                    textStyle={styles.orderTotal}
-                    iconSize={14}
-                    style={{ flexShrink: 0 }}
-                  />
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
+        <Pressable
+          disabled={orders.length === 0 || !chatEnabled || chatCheckLoading}
+          onPress={() => {
+            const firstOrder = orders[0];
+            if (!firstOrder) return;
+            navigation.navigate('OrderChat', {
+              orderId: firstOrder.id,
+              cafeName: booking.cafeName ?? undefined,
+            });
+          }}
+          style={({ pressed }) => [
+            styles.chatBtn,
+            styles.actionBtn,
+            (orders.length === 0 || !chatEnabled || chatCheckLoading) && Styles.disabled,
+            pressed && Styles.pressed,
+          ]}
+        >
+          <Ionicons name="chatbubble-outline" size={16} color={Colors.textInverse} style={styles.btnIcon} />
+          <Text style={[styles.chatBtnText, styles.actionBtnText]}>
+            {chatCheckLoading
+              ? t('chat.checkingChat')
+              : orders.length === 0
+                ? t('chat.afterOrder')
+                : !chatEnabled
+                  ? t('chat.chatDisabled')
+                  : t('chat.contactStaff')}
+          </Text>
+        </Pressable>
+      </View>
 
-          {canCancel ? (
+      {/* ── Orders ── */}
+      {orders.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('orders.myOrders')}</Text>
+          {orders.map((o, i) => (
             <Pressable
-              onPress={() => setCancelModalVisible(true)}
-              style={({ pressed }) => [styles.dangerBtn, pressed && styles.pressed]}
+              key={o.id}
+              onPress={() => navigation.navigate('OrderChat', { orderId: o.id, cafeName: booking.cafeName ?? undefined })}
+              style={({ pressed }) => [
+                styles.orderRow,
+                i === orders.length - 1 && styles.orderRowLast,
+                pressed && Styles.pressed,
+              ]}
             >
-              <Text style={styles.dangerBtnText}>{t('appointments.cancel')}</Text>
-            </Pressable>
-          ) : null}
-
-          {cancelMutation.error ? <Text style={styles.error}>{getErrorMessage(cancelMutation.error)}</Text> : null}
-
-          <Modal visible={cancelModalVisible} animationType="fade" transparent onRequestClose={() => setCancelModalVisible(false)}>
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalCard}>
-                <Text style={styles.modalTitle}>{t('appointments.cancel')}</Text>
-                <Text style={styles.label}>{t('appointments.cancelReason')}</Text>
-                <TextInput value={cancelReason} onChangeText={setCancelReason} placeholder="..." style={styles.input} />
-
-                <View style={styles.modalButtonsRow}>
-                  <Pressable onPress={() => setCancelModalVisible(false)} style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}>
-                    <Text style={styles.secondaryBtnText}>{t('appointments.close')}</Text>
-                  </Pressable>
-                  <Pressable
-                    disabled={cancelMutation.isPending}
-                    onPress={() => cancelMutation.mutate({ id, reason: cancelReason.trim() || undefined })}
-                    style={({ pressed }) => [styles.dangerBtn, cancelMutation.isPending && styles.disabled, pressed && styles.pressed]}
-                  >
-                    <Text style={styles.dangerBtnText}>{t('appointments.cancelConfirm')}</Text>
-                  </Pressable>
-                </View>
+              <View style={styles.orderLeft}>
+                <Text style={styles.orderNumber}>#{o.orderNumber}</Text>
+                <Text style={styles.orderStatus}>{ORDER_STATUS_LABELS[o.status] ?? o.status}</Text>
               </View>
-            </View>
-          </Modal>
+              <MoneyAmount value={o.totalAmount} textStyle={styles.orderTotal} iconSize={13} />
+              <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} />
+            </Pressable>
+          ))}
+        </View>
+      )}
 
-          <FullscreenQrModal
-            visible={qrVisible}
-            title={booking.cafeName ?? t('appointments.detailsTitle')}
-            value={qrValue}
-            onClose={() => setQrVisible(false)}
-          />
-        </>
+      {/* ── Cancel ── */}
+      {canCancel && (
+        <Pressable
+          onPress={() => setCancelModalVisible(true)}
+          style={({ pressed }) => [styles.dangerBtn, pressed && Styles.pressed]}
+        >
+          <Text style={styles.dangerBtnText}>{t('appointments.cancel')}</Text>
+        </Pressable>
+      )}
+
+      {cancelMutation.error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{getErrorMessage(cancelMutation.error)}</Text>
+        </View>
       ) : null}
+
+      {/* ── Cancel modal ── */}
+      <Modal visible={cancelModalVisible} animationType="fade" transparent onRequestClose={() => setCancelModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{t('appointments.cancel')}</Text>
+            <Text style={Styles.label}>{t('appointments.cancelReason')}</Text>
+            <TextInput
+              value={cancelReason}
+              onChangeText={setCancelReason}
+              placeholder="..."
+              style={Styles.input}
+              placeholderTextColor={Colors.textMuted}
+            />
+            <View style={styles.modalBtns}>
+              <Pressable
+                onPress={() => setCancelModalVisible(false)}
+                style={({ pressed }) => [Styles.secondaryBtn, styles.modalBtn, pressed && Styles.pressed]}
+              >
+                <Text style={Styles.secondaryBtnText}>{t('appointments.close')}</Text>
+              </Pressable>
+              <Pressable
+                disabled={cancelMutation.isPending}
+                onPress={() => cancelMutation.mutate({ id, reason: cancelReason.trim() || undefined })}
+                style={({ pressed }) => [
+                  styles.dangerBtn,
+                  styles.modalBtn,
+                  cancelMutation.isPending && Styles.disabled,
+                  pressed && Styles.pressed,
+                ]}
+              >
+                <Text style={styles.dangerBtnText}>{t('appointments.cancelConfirm')}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <FullscreenQrModal
+        visible={qrVisible}
+        title={booking.cafeName ?? t('appointments.detailsTitle')}
+        value={qrValue}
+        onClose={() => setQrVisible(false)}
+      />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  content: { padding: 16 },
-  title: { fontSize: 18, fontWeight: '700', marginBottom: 12 },
-  card: { padding: 12, borderRadius: 12, backgroundColor: '#f5f5f5' },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
-  h1: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  statusPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
-  statusText: { fontSize: 11, fontWeight: '700' },
-  meta: { fontSize: 12, opacity: 0.7, marginBottom: 10 },
-  kvRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginBottom: 6 },
-  k: { fontSize: 12, opacity: 0.7 },
-  v: { fontSize: 12, fontFamily: 'monospace', flexShrink: 1, textAlign: 'right' },
-  vInline: { fontSize: 13 },
-  error: { color: '#b00020', marginTop: 10 },
-  secondaryBtn: {
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#111',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-    flex: 1,
-    paddingHorizontal: 12,
-  },
-  secondaryBtnText: { fontSize: 14, fontWeight: '600', color: '#111', textAlign: 'center' },
-  primaryBtn: {
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#111',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-    paddingHorizontal: 12,
-  },
-  primaryBtnText: { fontSize: 14, fontWeight: '600', color: '#fff', textAlign: 'center' },
-  chatBtn: {
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#16a34a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-    paddingHorizontal: 12,
-  },
-  chatBtnText: { fontSize: 14, fontWeight: '600', color: '#fff', textAlign: 'center' },
-  ordersCard: { marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: '#f5f5f5' },
-  ordersTitle: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
-  orderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  orderNumber: { fontSize: 13, fontWeight: '600', flex: 1 },
-  orderStatus: { fontSize: 12, opacity: 0.8 },
-  orderTotal: { fontSize: 13, fontWeight: '600' },
-  dangerBtn: {
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#b00020',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-    flex: 1,
-    paddingHorizontal: 12,
-  },
-  dangerBtnText: { fontSize: 14, fontWeight: '600', color: '#fff', textAlign: 'center' },
-  qrCard: {
-    marginTop: 12,
-    alignSelf: 'center',
-    width: 168,
-    height: 168,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#eee',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-  },
-  qrPreview: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center' },
-  qrCenterBadge: {
-    position: 'absolute',
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  qrCenterLogo: { width: 24, height: 24, borderRadius: 8 },
-  pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.6 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center', padding: 16 },
-  modalCard: { width: '100%', maxWidth: 520, backgroundColor: '#fff', borderRadius: 16, padding: 16 },
-  modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
-  label: { fontSize: 12, opacity: 0.7, marginBottom: 6 },
-  input: { height: 44, borderRadius: 12, borderWidth: 1, borderColor: '#ddd', paddingHorizontal: 12, backgroundColor: '#fff' },
-  modalButtonsRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
-});
+  container: { flex: 1, backgroundColor: Colors.cream },
+  content: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  loadingText: { color: Colors.textMuted },
 
+  // Hero card
+  heroCard: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderLeftWidth: 4,
+    padding: Spacing.md,
+  },
+  heroTop: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
+  heroLeft: { flex: 1 },
+  cafeName: { fontSize: Typography.xl, fontWeight: '800', color: Colors.textPrimary, marginBottom: 4 },
+  heroDate: { fontSize: Typography.base, color: Colors.textSecondary, fontWeight: '500' },
+  heroDuration: { fontSize: Typography.sm, color: Colors.textMuted, marginTop: 2 },
+  statusBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.full },
+  statusText: { fontSize: Typography.xs, fontWeight: '700' },
+  amountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+  },
+  amountLabel: { fontSize: Typography.sm, color: Colors.textMuted },
+  amountValue: { fontSize: Typography.base, fontWeight: '700', color: Colors.textPrimary },
+  notesRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xs, marginTop: Spacing.sm },
+  notesText: { fontSize: Typography.sm, color: Colors.textMuted, flex: 1 },
+
+  // QR
+  qrCard: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+  },
+  qrInner: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center' },
+  qrBadge: {
+    position: 'absolute',
+    width: 32, height: 32,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.white,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  qrLogo: { width: 22, height: 22, borderRadius: 6 },
+  qrHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: Spacing.md },
+  qrHintText: { fontSize: Typography.sm, color: Colors.textMuted },
+
+  // Actions
+  actionsRow: { flexDirection: 'row', gap: Spacing.sm },
+  actionBtn: { flex: 1 },
+  actionBtnText: { flexShrink: 1, textAlign: 'center' },
+  btnIcon: { marginRight: Spacing.xs },
+  chatBtn: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.success,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+  },
+  chatBtnText: { color: Colors.textInverse, fontSize: Typography.sm, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
+
+  // Orders section
+  section: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+  },
+  sectionTitle: {
+    fontSize: Typography.base,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    padding: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  orderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  orderRowLast: { borderBottomWidth: 0 },
+  orderLeft: { flex: 1 },
+  orderNumber: { fontSize: Typography.base, fontWeight: '700', color: Colors.textPrimary },
+  orderStatus: { fontSize: Typography.sm, color: Colors.textMuted },
+  orderTotal: { fontSize: Typography.base, fontWeight: '600', color: Colors.coffeeDark },
+
+  // Danger
+  dangerBtn: {
+    height: 48,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dangerBtnText: { fontSize: Typography.base, fontWeight: '600', color: Colors.textInverse },
+
+  errorBox: {
+    backgroundColor: Colors.errorBg,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+  },
+  errorText: { color: Colors.error, fontSize: Typography.sm },
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: Colors.white,
+    borderRadius: Radius.xl,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalTitle: { fontSize: Typography.lg, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md },
+  modalBtns: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.lg },
+  modalBtn: { flex: 1 },
+});
