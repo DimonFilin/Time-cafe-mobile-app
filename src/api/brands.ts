@@ -1,13 +1,6 @@
 import { sharedApi } from '@/config/api';
 import { resolveFileUrl } from '@/utils/files';
 
-import {
-  getMockBrandBannerUrl,
-  getMockBrandById,
-  getMockBrandLogoUrl,
-  isMockBrandId,
-} from '@/api/mock-cafes';
-
 export type BrandDetails = {
   id: string;
   name: string;
@@ -34,28 +27,16 @@ export type BrandPresentation = BrandDetails & {
 };
 
 export async function getBrandById(id: string): Promise<BrandDetails> {
-  const mock = getMockBrandById(id);
-  if (mock) {
-    return mock;
-  }
   const res = await sharedApi.get(`/brands/${id}`);
   return res.data as BrandDetails;
 }
 
 export async function getBrandLogoSignedUrl(id: string): Promise<{ url: string }> {
-  const mockUrl = getMockBrandLogoUrl(id);
-  if (mockUrl) {
-    return { url: mockUrl };
-  }
   const res = await sharedApi.get(`/brands/${id}/logo-url`);
   return res.data as { url: string };
 }
 
 export async function getBrandBannerSignedUrl(id: string): Promise<{ url: string }> {
-  const mockUrl = getMockBrandBannerUrl(id);
-  if (mockUrl) {
-    return { url: mockUrl };
-  }
   const res = await sharedApi.get(`/brands/${id}/banner-url`);
   return res.data as { url: string };
 }
@@ -66,14 +47,6 @@ export async function getBrandPresentationById(id?: string | null): Promise<Bran
   }
 
   const brand = await getBrandById(id);
-
-  if (isMockBrandId(id)) {
-    return {
-      ...brand,
-      logoUrl: resolveFileUrl(brand.logo) ?? brand.logo,
-      bannerUrl: resolveFileUrl(brand.bannerImage) ?? brand.bannerImage,
-    };
-  }
 
   const [logoUrl, bannerUrl] = await Promise.all([
     getBrandLogoSignedUrl(id)
@@ -90,4 +63,3 @@ export async function getBrandPresentationById(id?: string | null): Promise<Bran
     bannerUrl: resolveFileUrl(bannerUrl) ?? bannerUrl,
   };
 }
-

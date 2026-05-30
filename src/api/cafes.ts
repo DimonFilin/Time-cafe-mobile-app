@@ -1,10 +1,5 @@
 import { sharedApi } from '@/config/api';
 import { getBrandPresentationById, type BrandPresentation } from '@/api/brands';
-import {
-  getMockCafeById,
-  getMockCafeList,
-  getMockCafePhotoUrls,
-} from '@/api/mock-cafes';
 import { getStableColorFromId } from '@/utils/colors';
 import { resolveFileUrl } from '@/utils/files';
 
@@ -40,6 +35,11 @@ type RawCafeDetails = {
   createdAt?: string;
   updatedAt?: string;
   openingHours?: Record<string, { open?: string; close?: string; closed?: boolean }> | null;
+  phone?: string;
+  email?: string;
+  occupancyMode?: 'PERCENT' | 'COUNT';
+  totalCapacity?: number;
+  isOpenNow?: boolean | null;
 };
 
 export type CafeTheme = {
@@ -107,6 +107,11 @@ export type CafeDetails = {
   createdAt?: string;
   updatedAt?: string;
   openingHours?: Record<string, { open?: string; close?: string; closed?: boolean }> | null;
+  phone?: string;
+  email?: string;
+  occupancyMode?: 'PERCENT' | 'COUNT';
+  totalCapacity?: number;
+  isOpenNow?: boolean | null;
   brand?: BrandPresentation;
   presentation: CafePresentation;
 };
@@ -247,39 +252,10 @@ export async function getCafes(params?: {
 }): Promise<CafeListResponse> {
   const res = await sharedApi.get('/cafes', { params });
   const response = res.data as { items: RawCafeListItem[]; total: number; page: number; limit: number; totalPages: number };
-  const filteredMockItems = getMockCafeList().filter((item) => {
-    const search = params?.search?.trim();
-    const city = params?.city?.trim();
-    const country = params?.country?.trim();
-
-    if (search) {
-      const haystack = [item.name, item.address, item.description, item.brandName]
-        .filter(Boolean)
-        .join(' ');
-      if (!matchesText(haystack, search)) {
-        return false;
-      }
-    }
-
-    if (!matchesText(item.city, city)) {
-      return false;
-    }
-
-    if (country && !matchesText(item.regionName, country) && !matchesText(item.address, country)) {
-      return false;
-    }
-
-    return true;
-  });
-
-  const mergedItems = sortCafeItems(
-    [...filteredMockItems, ...response.items],
-    params?.sortBy,
-    params?.sortOrder,
-  );
+  const sortedItems = sortCafeItems(response.items, params?.sortBy, params?.sortOrder);
 
   const items = await Promise.all(
-    mergedItems.map(async (item) => {
+    sortedItems.map(async (item) => {
       const detailsLike: RawCafeDetails = item;
       const [brand, photoUrls] = await Promise.all([
         loadBrandPresentation(item.brandId),
@@ -296,28 +272,19 @@ export async function getCafes(params?: {
 
   return {
     items,
-    total: items.length,
+    total: response.total,
     page: response.page,
     limit: response.limit,
-    totalPages: Math.max(1, Math.ceil(items.length / response.limit)),
+    totalPages: response.totalPages,
   };
 }
 
 export async function getCafeById(id: string): Promise<CafeDetails> {
-  const mockCafe = getMockCafeById(id);
-  if (mockCafe) {
-    return enrichCafe(mockCafe);
-  }
-
   const res = await sharedApi.get(`/cafes/${id}`);
   return enrichCafe(res.data as RawCafeDetails);
 }
 
 export async function getCafePhotoUrls(id: string): Promise<{ urls: string[] }> {
-  const mockUrls = getMockCafePhotoUrls(id);
-  if (mockUrls) {
-    return { urls: mockUrls };
-  }
   const res = await sharedApi.get(`/cafes/${id}/photo-urls`);
   return res.data as { urls: string[] };
 }

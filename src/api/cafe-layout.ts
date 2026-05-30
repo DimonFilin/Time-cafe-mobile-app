@@ -107,9 +107,11 @@ export type RoomAvailabilityResponse = {
 
 export type CafeOccupancy = {
   date: string;
+  occupancyMode?: 'PERCENT' | 'COUNT';
   totalCapacity: number;
   totalAppointments: number;
   occupancyPercent: number;
+  displayValue?: string;
   rooms: Array<{
     roomId: string;
     roomName: string;
@@ -121,6 +123,7 @@ export type CafeOccupancy = {
 
 export type CafeOccupancyRange = {
   mode: 'range';
+  occupancyMode?: 'PERCENT' | 'COUNT';
   from: string;
   to: string;
   days: Array<{
@@ -128,8 +131,9 @@ export type CafeOccupancyRange = {
     occupancyPercent: number;
     totalCapacity: number;
     totalAppointments: number;
+    displayValue?: string;
   }>;
-  summary: { avgOccupancyPercent: number };
+  summary: { avgOccupancyPercent: number; avgOccupied?: number; dayCount?: number };
 };
 
 export async function getCafeOccupancyRange(cafeId: string, from: string, to: string) {

@@ -1,10 +1,12 @@
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { format } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
 
 import { getCafeById } from '@/api/cafes';
+import { getCafeOccupancy } from '@/api/cafe-layout';
 import { getReviews } from '@/api/reviews';
 import { StarRating } from '@/components/StarRating';
 import { t } from '@/i18n';
@@ -36,6 +38,14 @@ export function CafeDetailsScreen({ route, navigation }: Props) {
   });
 
   const cafe = cafeQuery.data;
+  const todayYmd = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+
+  const occupancyQuery = useQuery({
+    queryKey: ['cafe-occupancy', id, todayYmd],
+    queryFn: () => getCafeOccupancy(id, todayYmd),
+    enabled: !!id,
+    retry: false,
+  });
 
   const ratingText = useMemo(() => {
     if (typeof cafe?.rating !== 'number') return '—';
@@ -140,6 +150,42 @@ export function CafeDetailsScreen({ route, navigation }: Props) {
         </View>
 
         {cafe?.address ? <Text style={[styles.address, { color: theme.text }]}>{cafe.address}</Text> : null}
+
+        <View style={[styles.infoCard, { borderColor: theme.border, backgroundColor: theme.card }]}>
+          {cafe?.phone ? (
+            <Pressable
+              onPress={() => {
+                if (
+                  /^(\+375-\d{2}-\d{3}-\d{2}-\d{2}|\+7-\d{3}-\d{2}-\d{2}-\d{2})$/.test(
+                    cafe.phone!,
+                  )
+                ) {
+                  void Linking.openURL(`tel:${cafe.phone.replace(/-/g, '')}`);
+                }
+              }}
+            >
+              <Text style={[styles.infoLine, { color: theme.text }]}>Телефон: {cafe.phone}</Text>
+            </Pressable>
+          ) : null}
+          {cafe?.email ? (
+            <Text style={[styles.infoLine, { color: theme.text }]}>Email: {cafe.email}</Text>
+          ) : null}
+          {cafe?.isOpenNow != null ? (
+            <Text style={[styles.infoLine, { color: theme.text }]}>
+              Статус: {cafe.isOpenNow ? 'Открыто' : 'Закрыто'}
+            </Text>
+          ) : null}
+          {occupancyQuery.data ? (
+            <Text style={[styles.infoLine, { color: theme.text }]}>
+              Загрузка:{' '}
+              {occupancyQuery.data.displayValue ??
+                (occupancyQuery.data.occupancyMode === 'COUNT'
+                  ? `${occupancyQuery.data.totalAppointments} из ${occupancyQuery.data.totalCapacity || 0}`
+                  : `${occupancyQuery.data.occupancyPercent}%`)}
+            </Text>
+          ) : null}
+        </View>
+
         {cafe?.description ? <Text style={[styles.desc, { color: theme.muted }]}>{cafe.description}</Text> : null}
 
         {/* ── Schedule ── */}
@@ -340,6 +386,8 @@ const styles = StyleSheet.create({
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   ratingText: { fontSize: 12 },
   address: { fontSize: 13, fontWeight: '600', marginTop: 12 },
+  infoCard: { marginTop: 12, borderWidth: 1, borderRadius: 12, padding: 12, gap: 6 },
+  infoLine: { fontSize: 13 },
   desc: { fontSize: 13, marginTop: 8, lineHeight: 18 },
   brandCard: { marginTop: 12, borderWidth: 1, borderRadius: 12, padding: 12, backgroundColor: '#fff' },
   brandTitle: { fontSize: 13, fontWeight: '800' },

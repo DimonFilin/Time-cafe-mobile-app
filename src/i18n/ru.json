@@ -103,7 +103,7 @@
     "status_completed": "Завершена",
     "createTitle": "Новая бронь",
     "createCafe": "Кафе",
-    "createDate": "Дата (ГГГГ-ММ-ДД)",
+    "createDate": "Выберите дату",
     "createTime": "Время (ЧЧ:мм)",
     "createDateTimePreview": "Предпросмотр",
     "createDuration": "Длительность (минуты)",
@@ -155,7 +155,9 @@
     "checkingChat": "Проверка чата...",
     "chatDisabled": "Чат отключен в кафе",
     "contactStaff": "Связаться с сотрудниками",
-    "afterOrder": "Сначала оформите заказ"
+    "afterOrder": "Сначала оформите заказ",
+    "workerProfileTitle": "Сотрудник",
+    "workerCafe": "Кафе"
   },
   "orders": {
     "title": "Заказ по брони",
@@ -190,11 +192,12 @@
     "saving": "Сохранение...",
     "avatarUpdated": "Аватар обновлен. Нажмите Сохранить для закрытия.",
     "maxLength": "Максимум 20 символов",
-    "phoneFormat": "Телефон должен быть в формате +375-XX-XXX-XX-XX",
+    "phoneFormat": "Телефон: +375-XX-XXX-XX-XX (Беларусь) или +7-XXX-XX-XX-XX (Россия)",
     "galleryPermission": "Требуется разрешение на доступ к галерее.",
     "openingGallery": "Открытие галереи…"
   },
   "common": {
+    "close": "Закрыть",
     "verified": "Проверено",
     "loading": "Загрузка...",
     "error": "Ошибка",

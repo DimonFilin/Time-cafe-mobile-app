@@ -14,6 +14,7 @@ import { CafesScreen } from '@/screens/CafesScreen';
 import { CafeReviewsScreen } from '@/screens/CafeReviewsScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { ReviewCreateScreen } from '@/screens/ReviewCreateScreen';
+import { stackHeaderScreenOptions } from '@/navigation/stack-header-options';
 import { Colors } from '@/utils/theme';
 
 export type AppTabsParamList = {
@@ -28,16 +29,7 @@ const BookingsStack = createStackNavigator<BookingsStackParamList>();
 
 function CafesStackNavigator() {
   return (
-    <CafesStack.Navigator
-      screenOptions={{
-        headerTitleAlign: 'center',
-        headerStyle: { backgroundColor: Colors.white },
-        headerTintColor: Colors.textPrimary,
-        headerTitleStyle: { fontWeight: '700', color: Colors.textPrimary },
-        headerShadowVisible: false,
-        headerBackgroundContainerStyle: { borderBottomWidth: 1, borderBottomColor: Colors.border },
-      }}
-    >
+    <CafesStack.Navigator screenOptions={stackHeaderScreenOptions}>
       <CafesStack.Screen name="CafesList" component={CafesScreen} options={{ title: t('cafes.listTitle') }} />
       <CafesStack.Screen
         name="CafeDetails"
@@ -62,16 +54,7 @@ function CafesStackNavigator() {
 
 function BookingsStackNavigator() {
   return (
-    <BookingsStack.Navigator
-      screenOptions={{
-        headerTitleAlign: 'center',
-        headerStyle: { backgroundColor: Colors.white },
-        headerTintColor: Colors.textPrimary,
-        headerTitleStyle: { fontWeight: '700', color: Colors.textPrimary },
-        headerShadowVisible: false,
-        headerBackgroundContainerStyle: { borderBottomWidth: 1, borderBottomColor: Colors.border },
-      }}
-    >
+    <BookingsStack.Navigator screenOptions={stackHeaderScreenOptions}>
       <BookingsStack.Screen
         name="BookingsList"
         component={BookingsScreen}

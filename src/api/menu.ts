@@ -1,5 +1,4 @@
 import { sharedApi } from '@/config/api';
-import { getMockCafeMenu } from '@/api/mock-cafes';
 
 export interface MenuItem {
   id: string;
@@ -30,10 +29,6 @@ export interface CafeMenuResponse {
 }
 
 export async function getCafeMenu(cafeId: string): Promise<CafeMenuResponse> {
-  const mockMenu = getMockCafeMenu(cafeId);
-  if (mockMenu) {
-    return mockMenu;
-  }
   const res = await sharedApi.get<CafeMenuResponse>(`/cafes/${cafeId}/menu`);
   return res.data;
 }

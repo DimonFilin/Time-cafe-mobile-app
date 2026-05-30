@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 
 import { t } from '@/i18n';
 import { AppTabs } from '@/navigation/AppTabs';
+import { stackHeaderScreenOptions } from '@/navigation/stack-header-options';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuthStore } from '@/store/authStore';
 import { BookingCreateScreen } from '@/screens/BookingCreateScreen';
@@ -11,19 +12,17 @@ import { DebugScreen } from '@/screens/DebugScreen';
 import { LoginScreen } from '@/screens/LoginScreen';
 import { RegisterScreen } from '@/screens/RegisterScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
+import { WalletScreen } from '@/screens/WalletScreen';
+import { ProfileDetailsScreen } from '@/screens/ProfileDetailsScreen';
+import { ProfileNotificationsScreen } from '@/screens/ProfileNotificationsScreen';
+import { ProfileScudScreen } from '@/screens/ProfileScudScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
-  const screenOptions = useMemo(
-    () => ({
-      headerBackTitleVisible: false,
-      headerTitleAlign: 'center' as const,
-    }),
-    []
-  );
+  const screenOptions = useMemo(() => stackHeaderScreenOptions, []);
 
   return (
     <Stack.Navigator screenOptions={screenOptions}>
@@ -43,6 +42,18 @@ export function RootNavigator() {
       />
       <Stack.Screen name="Cards" component={CardsScreen} options={{ title: t('cards.title') }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t('profile.settings') }} />
+      <Stack.Screen name="Wallet" component={WalletScreen} options={{ title: 'Депозит' }} />
+      <Stack.Screen
+        name="ProfileNotifications"
+        component={ProfileNotificationsScreen}
+        options={{ title: 'Уведомления' }}
+      />
+      <Stack.Screen
+        name="ProfileDetails"
+        component={ProfileDetailsScreen}
+        options={{ title: 'Мои данные' }}
+      />
+      <Stack.Screen name="ProfileScud" component={ProfileScudScreen} options={{ title: 'Карта СКУД' }} />
       <Stack.Screen name="Debug" component={DebugScreen} options={{ title: t('debug.title') }} />
     </Stack.Navigator>
   );

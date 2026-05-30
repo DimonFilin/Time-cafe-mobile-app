@@ -5,10 +5,20 @@ import { sharedApi } from '@/config/api';
 import { SHARED_API_URL } from '@/config/urls';
 import { useAuthStore } from '@/store/authStore';
 
+export interface OrderChatAuthorWorker {
+  id: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl?: string | null;
+  cafeName?: string | null;
+}
+
 export interface OrderChatMessage {
   id: string;
   chatId: string;
   authorType: 'USER' | 'WORKER';
+  authorWorkerId?: string | null;
+  authorWorker?: OrderChatAuthorWorker | null;
   text?: string | null;
   attachments: Array<{ id: string; url: string }>;
   createdAt: string;

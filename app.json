@@ -27,6 +27,14 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.qwerty_190.mobileapp"
-    }
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#6F4E37"
+        }
+      ]
+    ]
   }
 }

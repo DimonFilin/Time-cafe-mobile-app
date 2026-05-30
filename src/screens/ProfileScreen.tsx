@@ -2,22 +2,74 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
 import { getMyAvatarSignedUrl, me, updateMe, uploadMyAvatar, type UpdateMeInput } from '@/api/auth';
+import { getMyWallet, getNotifications, markLoyaltyWelcomeShown } from '@/api/wallet';
 import { clearPersistedSession } from '@/auth/session';
 import { FullscreenImageModal } from '@/components/FullscreenImageModal';
-import { MoneyAmount } from '@/components/currency/MoneyAmount';
+import type { RootStackParamList } from '@/navigation/types';
 import { t } from '@/i18n';
 import { useAuthStore } from '@/store/authStore';
 import { getErrorMessage } from '@/utils/errors';
 import { resolveFileUrl } from '@/utils/files';
+import { getLoyaltyTierTheme } from '@/utils/loyalty-tier-theme';
 import { Colors, Radius, Spacing, Styles, Typography } from '@/utils/theme';
 
+function MenuRow({
+  label,
+  onPress,
+  badge,
+}: {
+  label: string;
+  onPress: () => void;
+  badge?: number;
+}) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [menuStyles.row, pressed && menuStyles.pressed]}>
+      <Text style={menuStyles.label}>{label}</Text>
+      <View style={menuStyles.right}>
+        {badge != null && badge > 0 ? (
+          <View style={menuStyles.badge}>
+            <Text style={menuStyles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
+          </View>
+        ) : null}
+        <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+      </View>
+    </Pressable>
+  );
+}
+
+const menuStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  pressed: { opacity: 0.85 },
+  label: { fontSize: Typography.md, fontWeight: '600', color: Colors.textPrimary },
+  right: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  badge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  badgeText: { color: Colors.white, fontSize: 11, fontWeight: '700' },
+});
+
 export function ProfileScreen() {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const logout = useAuthStore((s) => s.logout);
@@ -46,6 +98,36 @@ export function ProfileScreen() {
   const [avatarSignedUrl, setAvatarSignedUrl] = useState<string | null>(null);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [avatarChanged, setAvatarChanged] = useState(false);
+  const [welcomeVisible, setWelcomeVisible] = useState(false);
+
+  const walletQuery = useQuery({
+    queryKey: ['myWallet'],
+    queryFn: getMyWallet,
+    enabled: isAuthenticated,
+  });
+
+  const notificationsQuery = useQuery({
+    queryKey: ['walletNotifications'],
+    queryFn: getNotifications,
+    enabled: isAuthenticated,
+  });
+
+  const unreadCount = useMemo(
+    () => (notificationsQuery.data ?? []).filter((n) => !n.readAt).length,
+    [notificationsQuery.data],
+  );
+
+  const tierTheme = useMemo(
+    () => getLoyaltyTierTheme(walletQuery.data?.loyaltyTier?.name),
+    [walletQuery.data?.loyaltyTier?.name],
+  );
+
+  useEffect(() => {
+    const w = walletQuery.data;
+    if (w?.loyaltyWelcomeEligible && w.loyaltyTier) {
+      setWelcomeVisible(true);
+    }
+  }, [walletQuery.data]);
 
   useEffect(() => {
     if (!user) return;
@@ -201,10 +283,14 @@ export function ProfileScreen() {
   }
 
   return (
-    <View style={[styles.safe, { paddingTop: insets.top }]}>
-      <View style={styles.container}>
+    <View style={[styles.safe, { paddingTop: insets.top, backgroundColor: tierTheme.screenBg }]}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: tierTheme.screenBg }}
+        contentContainerStyle={[styles.container, { backgroundColor: tierTheme.screenBg, paddingBottom: insets.bottom + Spacing.xl }]}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('auth.profile.title')}</Text>
+        <Text style={[styles.headerTitle, { color: tierTheme.textOnCard }]}>{t('auth.profile.title')}</Text>
 
         <View style={styles.headerActions}>
           <Pressable
@@ -248,7 +334,12 @@ export function ProfileScreen() {
         </View>
       </View>
 
-      <View style={styles.avatarRow}>
+      <View
+        style={[
+          styles.avatarRow,
+          { backgroundColor: tierTheme.headerBg, borderColor: tierTheme.cardBorder },
+        ]}
+      >
         <Pressable
           disabled={!user?.avatar}
           onPress={() => setAvatarFullscreenVisible(true)}
@@ -289,50 +380,41 @@ export function ProfileScreen() {
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.row}>
-          <Text style={styles.k}>{t('profile.email')}</Text>: {user?.email ?? '—'}
-        </Text>
-        <Text style={styles.row}>
-          <Text style={styles.k}>{t('profile.name')}</Text>: {(user?.firstName ?? '—')} {(user?.lastName ?? '')}
-        </Text>
-        <Text style={styles.row}>
-          <Text style={styles.k}>{t('profile.phone')}</Text>: {(user?.phone as any) ?? '—'}
-        </Text>
-        <Text style={styles.row}>
-          <Text style={styles.k}>{t('profile.gender')}</Text>:{' '}
-          {user?.gender === 'MALE'
-            ? t('profile.male')
-            : user?.gender === 'FEMALE'
-              ? t('profile.female')
-              : '—'}
-        </Text>
-        <View style={[styles.row, { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }]}>
-          <Text>
-            <Text style={styles.k}>{t('profile.balance')}</Text>:
-          </Text>
-          {user?.balance != null ? (
-            <MoneyAmount value={user.balance} textStyle={styles.rowValue} iconSize={14} />
-          ) : (
-            <Text style={styles.rowValue}>—</Text>
-          )}
-        </View>
+      <View style={[styles.menuCard, { borderColor: tierTheme.cardBorder, backgroundColor: tierTheme.cardBg }]}>
+        <MenuRow
+          label="Уведомления"
+          badge={unreadCount}
+          onPress={() => navigation.navigate('ProfileNotifications')}
+        />
+        <MenuRow label="Мои данные" onPress={() => navigation.navigate('ProfileDetails')} />
+        <MenuRow label="Карта СКУД" onPress={() => navigation.navigate('ProfileScud')} />
+        <MenuRow label="Депозит антикафе" onPress={() => navigation.navigate('Wallet')} />
+        <MenuRow label={t('profile.cards')} onPress={() => navigation.navigate('Cards')} />
       </View>
 
-      <Pressable
-        onPress={() => navigation.navigate('Cards')}
-        style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
-      >
-        <Text style={styles.secondaryBtnText}>{t('profile.cards')}</Text>
-      </Pressable>
-
-      
-      <Pressable
-        onPress={() => navigation.navigate('Settings')}
-        style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
-      >
-        <Text style={styles.secondaryBtnText}>{t('profile.settings')}</Text>
-      </Pressable>
+      <Modal visible={welcomeVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.card, { margin: Spacing.lg }]}>
+            <Text style={styles.avatarName}>Поздравляем!</Text>
+            <Text style={[styles.row, { marginTop: Spacing.sm }]}>
+              Телефон подтверждён, карта СКУД активна — вам назначен уровень «
+              {walletQuery.data?.loyaltyTier?.name ?? 'Бронзовый'}» в программе лояльности TimeCafe.
+              При пополнении депозита через 5 дней начислится бонус{' '}
+              {walletQuery.data?.loyaltyTier?.bonusPercent ?? 5}% от суммы (с округлением вниз).
+            </Text>
+            <Pressable
+              style={[styles.secondaryBtn, { marginTop: Spacing.md }]}
+              onPress={() => {
+                void markLoyaltyWelcomeShown();
+                setWelcomeVisible(false);
+                void walletQuery.refetch();
+              }}
+            >
+              <Text style={styles.secondaryBtnText}>Понятно</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={editVisible} transparent animationType="fade" onRequestClose={() => setEditVisible(false)}>
         <View style={styles.modalOverlay} pointerEvents="box-none">
@@ -440,7 +522,7 @@ export function ProfileScreen() {
           onClose={() => setAvatarFullscreenVisible(false)}
         />
       ) : null}
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -448,9 +530,22 @@ export function ProfileScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: Colors.white,
   },
-  container: { flex: 1, backgroundColor: Colors.white, padding: Spacing.lg },
+  container: { flex: 1, padding: Spacing.lg },
+  tierSkeleton: {
+    minHeight: 128,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuCard: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: Spacing.md,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

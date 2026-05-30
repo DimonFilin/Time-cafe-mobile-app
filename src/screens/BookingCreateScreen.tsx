@@ -16,7 +16,6 @@ import { BookingDateField, occupancyRangeToMap } from '@/components/BookingDateC
 import { getCards, type Card } from '@/api/cards';
 import { BookingPlanMap } from '@/components/BookingPlanMap';
 import { PlanMapErrorBoundary } from '@/components/PlanMapErrorBoundary';
-import { CurrencyUnitLabel } from '@/components/currency/CurrencyUnitLabel';
 import { MoneyAmount } from '@/components/currency/MoneyAmount';
 import {
   billingModesAvailable,
@@ -52,7 +51,7 @@ export function BookingCreateScreen({ navigation, route }: Props) {
   const [time, setTime] = useState(defaultTime);
   const [durationPreset, setDurationPreset] = useState(60);
   const [durationCustom, setDurationCustom] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'FREE' | 'BALANCE' | 'CARD' | 'CASH'>('FREE');
+  const [paymentMethod, setPaymentMethod] = useState<'FREE' | 'CARD' | 'CASH'>('FREE');
   const [billingMode, setBillingMode] = useState<RoomBillingMode>('HOURLY');
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
@@ -230,7 +229,10 @@ export function BookingCreateScreen({ navigation, route }: Props) {
         <SectionLabel>Загруженность кафе</SectionLabel>
         <Text style={styles.previewText}>
           {occupancyQuery.data
-            ? `${occupancyQuery.data.occupancyPercent}% (${occupancyQuery.data.totalAppointments}/${occupancyQuery.data.totalCapacity || 0})`
+            ? occupancyQuery.data.displayValue ??
+              (occupancyQuery.data.occupancyMode === 'COUNT'
+                ? `${occupancyQuery.data.totalAppointments} из ${occupancyQuery.data.totalCapacity || 0}`
+                : `${occupancyQuery.data.occupancyPercent}%`)
             : '—'}
         </Text>
       </View>
@@ -385,29 +387,25 @@ export function BookingCreateScreen({ navigation, route }: Props) {
           <View style={styles.chipsRow}>
             {availableBillingModes.map((mode) => {
               const active = billingMode === mode;
-              const rate = mode === 'HOURLY' ? roomBilling.hourlyRateRub : roomBilling.minuteRateRub;
-              const unit = mode === 'HOURLY' ? 'ч' : 'мин';
+              const hours =
+                durationValid && mode === 'HOURLY'
+                  ? Math.ceil(durationNumber / 60)
+                  : null;
+              const label =
+                mode === 'HOURLY'
+                  ? hours != null
+                    ? `Почасовая · ${hours} ч`
+                    : 'Почасовая'
+                  : durationValid
+                    ? `Поминутная · ${durationNumber} мин`
+                    : 'Поминутная';
               return (
                 <Pressable
                   key={mode}
                   onPress={() => setBillingMode(mode)}
                   style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && Styles.pressed]}
                 >
-                  <View style={styles.chipRateRow}>
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {mode === 'HOURLY' ? 'Почасовая' : 'Поминутная'} ·{' '}
-                    </Text>
-                    <MoneyAmount
-                      value={rate}
-                      iconSize={12}
-                      fractionDigits={mode === 'MINUTE' ? 2 : 0}
-                      textStyle={[styles.chipText, active && styles.chipTextActive]}
-                    />
-                    <CurrencyUnitLabel
-                      unit={unit}
-                      textStyle={[styles.chipText, active && styles.chipTextActive]}
-                    />
-                  </View>
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
                 </Pressable>
               );
             })}
@@ -420,10 +418,7 @@ export function BookingCreateScreen({ navigation, route }: Props) {
                     Округление до целых часов ({Math.ceil(durationNumber / 60)} ч)
                   </Text>
                 ) : (
-                  <View style={styles.chipRateRow}>
-                    <Text style={styles.previewText}>{durationNumber} мин × </Text>
-                    <MoneyAmount value={roomBilling.minuteRateRub} textStyle={styles.previewText} iconSize={12} />
-                  </View>
+                  <Text style={styles.previewText}>{durationNumber} мин</Text>
                 )}
               </View>
               <MoneyAmount value={totalPrice} textStyle={styles.priceAmount} />
@@ -436,7 +431,7 @@ export function BookingCreateScreen({ navigation, route }: Props) {
       <View style={styles.section}>
         <SectionLabel>{t('appointments.createPaymentMethod')}</SectionLabel>
         <View style={styles.chipsRow}>
-          {(['FREE', 'BALANCE', 'CARD', 'CASH'] as const).map((pm) => {
+          {(['FREE', 'CARD', 'CASH'] as const).map((pm) => {
             const active = paymentMethod === pm;
             return (
               <Pressable

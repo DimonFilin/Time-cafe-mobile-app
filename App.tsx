@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { DebugFab } from '@/components/DebugFab';
 import { useHydrateSession } from '@/hooks/useHydrateSession';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { navigationRef } from '@/navigation/navigationRef';
 import { RootNavigator } from '@/navigation/RootNavigator';
 
@@ -12,6 +13,7 @@ const queryClient = new QueryClient();
 
 export default function App() {
   const { ready } = useHydrateSession();
+  usePushNotifications();
 
   if (!ready) {
     return (

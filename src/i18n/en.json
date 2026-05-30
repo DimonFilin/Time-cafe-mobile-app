@@ -58,7 +58,7 @@
     "saving": "Saving...",
     "avatarUpdated": "Avatar updated. Press Save to close.",
     "maxLength": "Maximum 20 characters",
-    "phoneFormat": "Phone should be in format +375-XX-XXX-XX-XX",
+    "phoneFormat": "Phone: +375-XX-XXX-XX-XX (Belarus) or +7-XXX-XX-XX-XX (Russia)",
     "galleryPermission": "Gallery access permission is required.",
     "openingGallery": "Opening gallery..."
   },
@@ -125,7 +125,7 @@
     "status_completed": "Completed",
     "createTitle": "New booking",
     "createCafe": "Cafe",
-    "createDate": "Date (YYYY-MM-DD)",
+    "createDate": "Select date",
     "createTime": "Time (HH:mm)",
     "createDateTimePreview": "Preview",
     "createDuration": "Duration (minutes)",

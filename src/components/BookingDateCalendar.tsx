@@ -24,7 +24,7 @@ const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 type Props = {
   value: string;
   onChange: (ymd: string) => void;
-  occupancyByDate?: Map<string, number>;
+  occupancyByDate?: Map<string, string>;
   loading?: boolean;
   onMonthChange?: (monthStart: Date) => void;
 };
@@ -120,7 +120,7 @@ export function BookingDateField({ value, onChange, occupancyByDate, loading, on
                     </Text>
                     {inMonth && occ != null && (
                       <Text style={[styles.occPct, selected && styles.occPctSelected]}>
-                        {occ}%
+                        {occ}
                       </Text>
                     )}
                   </Pressable>
@@ -138,10 +138,16 @@ export function BookingDateField({ value, onChange, occupancyByDate, loading, on
 }
 
 export function occupancyRangeToMap(data: CafeOccupancyRange | undefined) {
-  const map = new Map<string, number>();
+  const map = new Map<string, string>();
   if (!data || data.mode !== 'range') return map;
   for (const day of data.days) {
-    map.set(day.date, day.occupancyPercent);
+    map.set(
+      day.date,
+      day.displayValue ??
+        (data.occupancyMode === 'COUNT'
+          ? `${day.totalAppointments}/${day.totalCapacity || 0}`
+          : `${day.occupancyPercent}%`),
+    );
   }
   return map;
 }

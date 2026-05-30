@@ -19,10 +19,12 @@ import type { BookingsStackParamList } from '@/navigation/stacks';
 import {
   getOrderChatByOrder,
   getOrderChatMessages,
+  OrderChatAuthorWorker,
   OrderChatMessage,
   sendOrderChatMessage,
   uploadOrderChatAttachment,
 } from '@/api/order-chat';
+import { WorkerPublicProfileModal } from '@/components/WorkerPublicProfileModal';
 import { t } from '@/i18n';
 import { getSharedApiOrigin } from '@/config/urls';
 import { useAuthStore } from '@/store/authStore';
@@ -45,6 +47,7 @@ export function OrderChatScreen({ route }: Props) {
   const [attachments, setAttachments] = useState<Array<{ id: string; url: string }>>([]);
   const [isRemoteTyping, setIsRemoteTyping] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [workerProfile, setWorkerProfile] = useState<OrderChatAuthorWorker | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
   const shouldAutoScrollRef = useRef(true);
 
@@ -240,38 +243,73 @@ export function OrderChatScreen({ route }: Props) {
         }}
         scrollEventThrottle={16}
       >
-        {messages.map((m) => (
-          <View
-            key={m.id}
-            style={[styles.bubble, m.authorType === 'USER' ? styles.myBubble : styles.otherBubble]}
-          >
-            {m.text ? <Text style={m.authorType === 'USER' ? styles.myText : styles.otherText}>{m.text}</Text> : null}
-            {!!m.attachments?.length && (
-              <View
-                style={[
-                  styles.imagesGrid,
-                  m.authorType === 'USER' ? styles.imagesGridMine : styles.imagesGridTheirs,
-                ]}
-              >
-                {m.attachments.slice(0, 4).map((a) => {
-                  const uri = resolveFileUrl(a.url) || a.url;
-                  return (
-                    <Pressable key={a.id} onPress={() => setPreviewImageUrl(uri)}>
-                      <Image
-                        source={{ uri }}
-                        style={[styles.chatImage, { width: attachmentThumbWidth }]}
-                        resizeMode="cover"
-                        onError={() => {
-                          console.error('[OrderChat] chat image failed', { attachmentId: a.id, url: uri });
-                        }}
-                      />
-                    </Pressable>
-                  );
-                })}
+        {messages.map((m) => {
+          const isMine = m.authorType === 'USER';
+          const worker = m.authorWorker;
+          const workerName = worker
+            ? `${worker.firstName} ${worker.lastName}`.trim()
+            : t('chat.workerProfileTitle');
+          const workerAvatarUri = worker?.avatarUrl
+            ? resolveFileUrl(worker.avatarUrl) || worker.avatarUrl
+            : null;
+
+          return (
+            <View
+              key={m.id}
+              style={[styles.messageRow, isMine ? styles.messageRowMine : styles.messageRowTheirs]}
+            >
+              {!isMine && worker ? (
+                <Pressable
+                  onPress={() => setWorkerProfile(worker)}
+                  style={styles.workerAvatarBtn}
+                  accessibilityLabel={workerName}
+                >
+                  {workerAvatarUri ? (
+                    <Image source={{ uri: workerAvatarUri }} style={styles.workerAvatar} />
+                  ) : (
+                    <View style={styles.workerAvatarPlaceholder}>
+                      <Text style={styles.workerAvatarInitial}>
+                        {workerName.slice(0, 1).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              ) : null}
+              <View style={[styles.bubble, isMine ? styles.myBubble : styles.otherBubble]}>
+                {m.text ? (
+                  <Text style={isMine ? styles.myText : styles.otherText}>{m.text}</Text>
+                ) : null}
+                {!!m.attachments?.length && (
+                  <View
+                    style={[
+                      styles.imagesGrid,
+                      isMine ? styles.imagesGridMine : styles.imagesGridTheirs,
+                    ]}
+                  >
+                    {m.attachments.slice(0, 4).map((a) => {
+                      const uri = resolveFileUrl(a.url) || a.url;
+                      return (
+                        <Pressable key={a.id} onPress={() => setPreviewImageUrl(uri)}>
+                          <Image
+                            source={{ uri }}
+                            style={[styles.chatImage, { width: attachmentThumbWidth }]}
+                            resizeMode="cover"
+                            onError={() => {
+                              console.error('[OrderChat] chat image failed', {
+                                attachmentId: a.id,
+                                url: uri,
+                              });
+                            }}
+                          />
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
-            )}
-          </View>
-        ))}
+            </View>
+          );
+        })}
       </ScrollView>
       {isRemoteTyping ? (
         <View style={styles.typingRow}>
@@ -302,6 +340,12 @@ export function OrderChatScreen({ route }: Props) {
           {uploading ? t('chat.uploading') : `${t('chat.attachments')}: ${attachments.length}/4`}
         </Text>
       </View>
+
+      <WorkerPublicProfileModal
+        worker={workerProfile}
+        visible={Boolean(workerProfile)}
+        onClose={() => setWorkerProfile(null)}
+      />
 
       <Modal
         visible={Boolean(previewImageUrl)}
@@ -343,6 +387,46 @@ export function OrderChatScreen({ route }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.cream },
   messagesContent: { padding: Spacing.md, gap: Spacing.sm, paddingBottom: Spacing.lg },
+  messageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: Spacing.sm,
+    maxWidth: '100%',
+  },
+  messageRowMine: {
+    alignSelf: 'flex-end',
+    justifyContent: 'flex-end',
+  },
+  messageRowTheirs: {
+    alignSelf: 'flex-start',
+    justifyContent: 'flex-start',
+  },
+  workerAvatarBtn: {
+    marginBottom: 2,
+  },
+  workerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.beige,
+  },
+  workerAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.beige,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  workerAvatarInitial: {
+    fontSize: Typography.sm,
+    fontWeight: '700',
+    color: Colors.coffeeDark,
+  },
   bubble: {
     maxWidth: '92%',
     borderRadius: Radius.lg,
