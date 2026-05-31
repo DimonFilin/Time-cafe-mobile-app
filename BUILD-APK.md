@@ -36,13 +36,17 @@ cd android
 
 APK будет здесь: `android/app/build/outputs/apk/release/app-release.apk`.
 
-### Через PowerShell (попытка обойти code page)
+### Через PowerShell (рекомендуется)
+
+Скрипт сам подгружает `.env` перед сборкой (иначе в APK попадёт `localhost`):
 
 ```powershell
-cd "C:\My files\колледж\Diplom\time-caffe\mobile-app\android"
-$env:CI = "1"
-.\gradlew.bat assembleRelease
+powershell -ExecutionPolicy Bypass -File "mobile-app\scripts\build-apk-windows.ps1"
 ```
+
+Перед сборкой проверьте `.env` (IP ПК в Wi‑Fi, не `localhost`). При смене сети: `npm run sync-lan-env`.
+
+Не используйте `gradlew clean` в пути с пробелами (`My files`) — CMake может упасть. Скрипт `build-apk-windows.ps1` удаляет только старый JS-бандл и пересобирает release.
 
 Если ошибка сохраняется, используйте Вариант 1 (EAS Build).
 

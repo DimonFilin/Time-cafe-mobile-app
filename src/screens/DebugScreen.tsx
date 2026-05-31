@@ -4,10 +4,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 
 import { checkBackendHealth } from '@/api/health';
+import { SHARED_API_URL } from '@/config/urls';
 import { t } from '@/i18n';
 
 export function DebugScreen() {
-  const sharedApiUrl = process.env.EXPO_PUBLIC_SHARED_API_URL || 'http://localhost:3000';
+  const sharedApiUrl = SHARED_API_URL;
 
   const healthQuery = useQuery({
     queryKey: ['backend-health'],
