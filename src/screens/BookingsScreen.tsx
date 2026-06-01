@@ -6,6 +6,7 @@ import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'r
 
 import type { AppointmentStatus } from '@/api/appointments';
 import { getMyAppointments } from '@/api/appointments';
+import { useTabScreenBottomPadding } from '@/hooks/useTabScreenBottomPadding';
 import { t } from '@/i18n';
 import type { BookingsStackParamList } from '@/navigation/stacks';
 import { formatDateTime } from '@/utils/dates';
@@ -34,6 +35,7 @@ const STATUS_ICONS: Record<AppointmentStatus, string> = {
 };
 
 export function BookingsScreen({ navigation }: Props) {
+  const listBottomPadding = useTabScreenBottomPadding();
   const [modalVisible, setModalVisible] = useState(false);
   const [draft, setDraft] = useState<Filters>({ statuses: [], from: '', to: '' });
   const [applied, setApplied] = useState<Filters>({ statuses: [] });
@@ -186,7 +188,11 @@ export function BookingsScreen({ navigation }: Props) {
         keyExtractor={(item) => item.id}
         refreshing={bookingsQuery.isFetching}
         onRefresh={() => bookingsQuery.refetch()}
-        contentContainerStyle={items.length === 0 ? styles.emptyContainer : styles.listContent}
+        contentContainerStyle={
+          items.length === 0
+            ? styles.emptyContainer
+            : [styles.listContent, { paddingBottom: listBottomPadding }]
+        }
         ListEmptyComponent={
           !bookingsQuery.isLoading ? (
             <View style={styles.emptyState}>

@@ -6,6 +6,7 @@ import { FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } 
 
 import { getCafes, type CafesSortBy, type CafesSortOrder } from '@/api/cafes';
 import { StarRating } from '@/components/StarRating';
+import { useTabScreenBottomPadding } from '@/hooks/useTabScreenBottomPadding';
 import { t } from '@/i18n';
 import type { CafesStackParamList } from '@/navigation/stacks';
 import { Colors, Radius, Spacing, Styles, Typography } from '@/utils/theme';
@@ -63,6 +64,7 @@ function CafeThumb(props: {
 }
 
 export function CafesScreen({ navigation }: Props) {
+  const listBottomPadding = useTabScreenBottomPadding();
   const [modalVisible, setModalVisible] = useState(false);
 
   const [draft, setDraft] = useState<CafesQueryParams>({
@@ -236,6 +238,7 @@ export function CafesScreen({ navigation }: Props) {
         keyExtractor={(item) => item.id}
         refreshing={cafesQuery.isFetching}
         onRefresh={() => cafesQuery.refetch()}
+        contentContainerStyle={{ paddingBottom: listBottomPadding }}
         ListEmptyComponent={!cafesQuery.isLoading ? <Text style={styles.topText}>{t('cafes.empty')}</Text> : null}
         renderItem={({ item }) => (
           <Pressable

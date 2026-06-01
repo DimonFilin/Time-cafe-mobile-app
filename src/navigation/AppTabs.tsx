@@ -2,6 +2,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { t } from '@/i18n';
 import type { BookingsStackParamList, CafesStackParamList } from '@/navigation/stacks';
@@ -79,7 +80,12 @@ function BookingsStackNavigator() {
   );
 }
 
+const TAB_BAR_CONTENT_HEIGHT = 56;
+
 export function AppTabs() {
+  const insets = useSafeAreaInsets();
+  const tabBarBottom = Math.max(insets.bottom, 8);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -108,6 +114,8 @@ export function AppTabs() {
           backgroundColor: Colors.white,
           borderTopColor: Colors.border,
           borderTopWidth: 1,
+          paddingBottom: tabBarBottom,
+          height: TAB_BAR_CONTENT_HEIGHT + tabBarBottom,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       })}

@@ -1,7 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLayoutEffect, useMemo, useState } from 'react';
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Dimensions,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { addCard, deleteCard, getCards, setDefaultCard, type AddCardInput, type Card } from '@/api/cards';
 import { t } from '@/i18n';
@@ -25,7 +38,10 @@ function luhnCheck(cardNumberDigits: string) {
   return sum % 10 === 0;
 }
 
+const SHEET_MAX_HEIGHT = Dimensions.get('window').height * 0.92;
+
 export function CardsScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
   const [cardNumber, setCardNumber] = useState('');
@@ -85,90 +101,116 @@ export function CardsScreen({ navigation }: any) {
       {/* Add card modal */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>{t('cards.addCard') ?? 'Добавить карту'}</Text>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={[styles.modalSheetWrap, { maxHeight: SHEET_MAX_HEIGHT }]}
+          >
+            <View style={[styles.modalCard, { paddingBottom: insets.bottom + Spacing.lg, maxHeight: SHEET_MAX_HEIGHT }]}>
+              <View style={styles.modalHandle} />
+              <Text style={styles.modalTitle}>{t('cards.addCard') ?? 'Добавить карту'}</Text>
 
-            <Text style={Styles.label}>{t('cards.cardNumber') ?? 'Номер карты'}</Text>
-            <TextInput
-              value={cardNumber}
-              onChangeText={(v) => setCardNumber(digitsOnly(v, 16))}
-              keyboardType="number-pad"
-              maxLength={16}
-              style={Styles.input}
-              placeholder="4242 4242 4242 4242"
-              placeholderTextColor={Colors.textMuted}
-            />
-
-            <View style={styles.row}>
-              <View style={styles.halfField}>
-                <Text style={Styles.label}>{t('cards.expiryMonth') ?? 'Месяц'}</Text>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.modalScrollContent}
+              >
+                <Text style={Styles.label}>{t('cards.cardNumber') ?? 'Номер карты'}</Text>
                 <TextInput
-                  value={expiryMonth}
-                  onChangeText={(v) => setExpiryMonth(digitsOnly(v, 2))}
+                  value={cardNumber}
+                  onChangeText={(v) => setCardNumber(digitsOnly(v, 16))}
                   keyboardType="number-pad"
-                  maxLength={2}
+                  maxLength={16}
                   style={Styles.input}
-                  placeholder="12"
+                  placeholder="4242 4242 4242 4242"
                   placeholderTextColor={Colors.textMuted}
                 />
-              </View>
-              <View style={styles.halfField}>
-                <Text style={Styles.label}>{t('cards.expiryYear') ?? 'Год'}</Text>
+
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <Text style={Styles.label}>{t('cards.expiryMonth') ?? 'Месяц'}</Text>
+                    <TextInput
+                      value={expiryMonth}
+                      onChangeText={(v) => setExpiryMonth(digitsOnly(v, 2))}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                      style={Styles.input}
+                      placeholder="12"
+                      placeholderTextColor={Colors.textMuted}
+                    />
+                  </View>
+                  <View style={styles.halfField}>
+                    <Text style={Styles.label}>{t('cards.expiryYear') ?? 'Год'}</Text>
+                    <TextInput
+                      value={expiryYear}
+                      onChangeText={(v) => setExpiryYear(digitsOnly(v, 4))}
+                      keyboardType="number-pad"
+                      maxLength={4}
+                      style={Styles.input}
+                      placeholder="2028"
+                      placeholderTextColor={Colors.textMuted}
+                    />
+                  </View>
+                </View>
+
+                <Text style={Styles.label}>{t('cards.cvv') ?? 'CVV'}</Text>
                 <TextInput
-                  value={expiryYear}
-                  onChangeText={(v) => setExpiryYear(digitsOnly(v, 4))}
+                  value={cvv}
+                  onChangeText={(v) => setCvv(digitsOnly(v, 3))}
                   keyboardType="number-pad"
-                  maxLength={4}
+                  maxLength={3}
+                  secureTextEntry
                   style={Styles.input}
-                  placeholder="2028"
+                  placeholder="123"
                   placeholderTextColor={Colors.textMuted}
                 />
+
+                <Text style={Styles.label}>{t('cards.holderName') ?? 'Имя держателя (необязательно)'}</Text>
+                <TextInput
+                  value={holderName}
+                  onChangeText={setHolderName}
+                  style={Styles.input}
+                  placeholderTextColor={Colors.textMuted}
+                />
+
+                {addMutation.error ? (
+                  <View style={styles.errorBox}>
+                    <Text style={styles.errorText}>{t('cards.errorAdd') ?? 'Не удалось добавить карту'}</Text>
+                  </View>
+                ) : null}
+              </ScrollView>
+
+              <View style={styles.modalBtns}>
+                <Pressable
+                  onPress={() => setModalVisible(false)}
+                  style={({ pressed }) => [Styles.secondaryBtn, styles.modalBtn, pressed && Styles.pressed]}
+                >
+                  <Text style={Styles.secondaryBtnText}>{t('appointments.close') ?? 'Закрыть'}</Text>
+                </Pressable>
+                <Pressable
+                  disabled={!canSubmit || addMutation.isPending}
+                  onPress={() =>
+                    addMutation.mutate({
+                      cardNumber,
+                      expiryMonth: monthNum,
+                      expiryYear: yearNum,
+                      cvv,
+                      holderName: holderName.trim() || undefined,
+                    })
+                  }
+                  style={({ pressed }) => [
+                    Styles.primaryBtn,
+                    styles.modalBtn,
+                    (!canSubmit || addMutation.isPending) && Styles.disabled,
+                    pressed && Styles.pressed,
+                  ]}
+                >
+                  <Text style={Styles.primaryBtnText}>
+                    {addMutation.isPending ? '...' : (t('cards.add') ?? 'Добавить')}
+                  </Text>
+                </Pressable>
               </View>
             </View>
-
-            <Text style={Styles.label}>{t('cards.cvv') ?? 'CVV'}</Text>
-            <TextInput
-              value={cvv}
-              onChangeText={(v) => setCvv(digitsOnly(v, 3))}
-              keyboardType="number-pad"
-              maxLength={3}
-              secureTextEntry
-              style={Styles.input}
-              placeholder="123"
-              placeholderTextColor={Colors.textMuted}
-            />
-
-            <Text style={Styles.label}>{t('cards.holderName') ?? 'Имя держателя (необязательно)'}</Text>
-            <TextInput
-              value={holderName}
-              onChangeText={setHolderName}
-              style={Styles.input}
-              placeholderTextColor={Colors.textMuted}
-            />
-
-            {addMutation.error ? (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{t('cards.errorAdd') ?? 'Не удалось добавить карту'}</Text>
-              </View>
-            ) : null}
-
-            <View style={styles.modalBtns}>
-              <Pressable
-                onPress={() => setModalVisible(false)}
-                style={({ pressed }) => [Styles.secondaryBtn, styles.modalBtn, pressed && Styles.pressed]}
-              >
-                <Text style={Styles.secondaryBtnText}>{t('appointments.close') ?? 'Закрыть'}</Text>
-              </Pressable>
-              <Pressable
-                disabled={!canSubmit || addMutation.isPending}
-                onPress={() => addMutation.mutate({ cardNumber, expiryMonth: monthNum, expiryYear: yearNum, cvv, holderName: holderName.trim() || undefined })}
-                style={({ pressed }) => [Styles.primaryBtn, styles.modalBtn, (!canSubmit || addMutation.isPending) && Styles.disabled, pressed && Styles.pressed]}
-              >
-                <Text style={Styles.primaryBtnText}>{addMutation.isPending ? '...' : (t('cards.add') ?? 'Добавить')}</Text>
-              </Pressable>
-            </View>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -177,7 +219,11 @@ export function CardsScreen({ navigation }: any) {
         keyExtractor={(item) => item.id}
         refreshing={cardsQuery.isFetching}
         onRefresh={() => cardsQuery.refetch()}
-        contentContainerStyle={sortedCards.length === 0 ? styles.emptyContainer : styles.listContent}
+        contentContainerStyle={
+          sortedCards.length === 0
+            ? styles.emptyContainer
+            : [styles.listContent, { paddingBottom: insets.bottom + Spacing.lg }]
+        }
         ListEmptyComponent={
           !cardsQuery.isLoading ? (
             <View style={styles.emptyState}>
@@ -279,15 +325,18 @@ const styles = StyleSheet.create({
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalSheetWrap: { width: '100%' },
   modalCard: {
     backgroundColor: Colors.white,
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
     borderTopWidth: 1,
     borderColor: Colors.border,
+    minHeight: '55%',
   },
+  modalScrollContent: { paddingBottom: Spacing.sm, flexGrow: 1 },
   modalHandle: {
     width: 36, height: 4,
     borderRadius: Radius.full,

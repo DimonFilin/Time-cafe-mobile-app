@@ -4,6 +4,7 @@ import { refreshAccessToken } from '@/auth/session';
 import { sharedApi } from '@/config/api';
 import { SHARED_API_URL } from '@/config/urls';
 import { useAuthStore } from '@/store/authStore';
+import { resolveFileUrl } from '@/utils/files';
 
 export interface OrderChatAuthorWorker {
   id: string;
@@ -28,6 +29,29 @@ export interface OrderChatSummary {
   id: string;
   orderId: string;
   isEnabled: boolean;
+}
+
+export type ChatImageSource = {
+  uri: string;
+  headers?: { Authorization: string };
+};
+
+/** Loads chat images via shared API (works on device; presigned localhost / admin proxy URLs do not). */
+export function orderChatAttachmentImageSource(
+  chatId: string | null,
+  attachmentId: string,
+  accessToken: string | null | undefined,
+  fallbackUrl?: string | null,
+): ChatImageSource {
+  const origin = sharedApiOrigin();
+  if (chatId && attachmentId && accessToken && origin) {
+    return {
+      uri: `${origin}/order-chats/${chatId}/attachments/${attachmentId}/file`,
+      headers: { Authorization: `Bearer ${accessToken}` },
+    };
+  }
+  const uri = resolveFileUrl(fallbackUrl) || String(fallbackUrl || '').trim();
+  return { uri };
 }
 
 export async function getOrderChatByOrder(orderId: string) {

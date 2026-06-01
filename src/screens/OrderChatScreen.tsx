@@ -22,7 +22,9 @@ import {
   OrderChatAuthorWorker,
   OrderChatMessage,
   sendOrderChatMessage,
+  orderChatAttachmentImageSource,
   uploadOrderChatAttachment,
+  type ChatImageSource,
 } from '@/api/order-chat';
 import { WorkerPublicProfileModal } from '@/components/WorkerPublicProfileModal';
 import { t } from '@/i18n';
@@ -46,7 +48,7 @@ export function OrderChatScreen({ route }: Props) {
   const [uploading, setUploading] = useState(false);
   const [attachments, setAttachments] = useState<Array<{ id: string; url: string }>>([]);
   const [isRemoteTyping, setIsRemoteTyping] = useState(false);
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<ChatImageSource | null>(null);
   const [workerProfile, setWorkerProfile] = useState<OrderChatAuthorWorker | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
   const shouldAutoScrollRef = useRef(true);
@@ -287,17 +289,22 @@ export function OrderChatScreen({ route }: Props) {
                     ]}
                   >
                     {m.attachments.slice(0, 4).map((a) => {
-                      const uri = resolveFileUrl(a.url) || a.url;
+                      const source = orderChatAttachmentImageSource(
+                        chatId,
+                        a.id,
+                        token,
+                        a.url,
+                      );
                       return (
-                        <Pressable key={a.id} onPress={() => setPreviewImageUrl(uri)}>
+                        <Pressable key={a.id} onPress={() => setPreviewImage(source)}>
                           <Image
-                            source={{ uri }}
+                            source={source}
                             style={[styles.chatImage, { width: attachmentThumbWidth }]}
                             resizeMode="cover"
                             onError={() => {
                               console.error('[OrderChat] chat image failed', {
                                 attachmentId: a.id,
-                                url: uri,
+                                url: source.uri,
                               });
                             }}
                           />
@@ -348,28 +355,28 @@ export function OrderChatScreen({ route }: Props) {
       />
 
       <Modal
-        visible={Boolean(previewImageUrl)}
+        visible={Boolean(previewImage)}
         transparent
         animationType="fade"
-        onRequestClose={() => setPreviewImageUrl(null)}
+        onRequestClose={() => setPreviewImage(null)}
       >
-        <Pressable style={styles.previewOverlay} onPress={() => setPreviewImageUrl(null)}>
+        <Pressable style={styles.previewOverlay} onPress={() => setPreviewImage(null)}>
           <Pressable style={styles.previewCard} onPress={() => {}}>
-            {previewImageUrl ? (
+            {previewImage ? (
               <View style={styles.previewFrame}>
                 <Image
-                  source={{ uri: resolveFileUrl(previewImageUrl) || previewImageUrl }}
+                  source={previewImage}
                   style={styles.previewImage}
                   resizeMode="contain"
                   onError={() => {
-                    console.error('[OrderChat] preview image failed', { url: previewImageUrl });
+                    console.error('[OrderChat] preview image failed', { url: previewImage.uri });
                   }}
                 />
                 <Pressable
                   style={styles.downloadBtn}
                   onPress={() => {
-                    if (!previewImageUrl) return;
-                    void Linking.openURL(previewImageUrl);
+                    if (!previewImage) return;
+                    void Linking.openURL(previewImage.uri);
                   }}
                 >
                   <Text style={styles.downloadBtnText}>{t('chat.download')}</Text>

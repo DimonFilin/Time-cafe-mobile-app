@@ -37,5 +37,6 @@
 
 ## Известные edge-cases
 
-- Если signed URL содержит `localhost`, изображение не откроется на физическом устройстве.
+- Вложения в чате грузятся через `GET /order-chats/:chatId/attachments/:id/file` с Bearer (не через presigned MinIO и не через админский `/api/media-s3/...` на `:3001`).
+- Presigned URL с `localhost` на телефоне не работают (подпись привязана к host); для чата это обходится API-стримом.
 - При нестабильной сети socket может переподключаться; обработчики построены с учетом reconnection.

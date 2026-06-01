@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { useTabScreenBottomPadding } from '@/hooks/useTabScreenBottomPadding';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -71,6 +73,7 @@ const menuStyles = StyleSheet.create({
 export function ProfileScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
+  const tabBottomPadding = useTabScreenBottomPadding(Spacing.xl);
   const queryClient = useQueryClient();
   const logout = useAuthStore((s) => s.logout);
   const sessionUser = useAuthStore((s) => s.user);
@@ -286,7 +289,7 @@ export function ProfileScreen() {
     <View style={[styles.safe, { paddingTop: insets.top, backgroundColor: tierTheme.screenBg }]}>
       <ScrollView
         style={{ flex: 1, backgroundColor: tierTheme.screenBg }}
-        contentContainerStyle={[styles.container, { backgroundColor: tierTheme.screenBg, paddingBottom: insets.bottom + Spacing.xl }]}
+        contentContainerStyle={[styles.container, { backgroundColor: tierTheme.screenBg, paddingBottom: tabBottomPadding }]}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
