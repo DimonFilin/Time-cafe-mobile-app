@@ -293,13 +293,13 @@ export function BookingDetailsScreen({ route, navigation }: Props) {
                 disabled={cancelMutation.isPending}
                 onPress={() => cancelMutation.mutate({ id, reason: cancelReason.trim() || undefined })}
                 style={({ pressed }) => [
-                  styles.dangerBtn,
+                  styles.modalDangerBtn,
                   styles.modalBtn,
                   cancelMutation.isPending && Styles.disabled,
                   pressed && Styles.pressed,
                 ]}
               >
-                <Text style={styles.dangerBtnText}>{t('appointments.cancelConfirm')}</Text>
+                <Text style={styles.modalDangerBtnText}>{t('appointments.cancelConfirm')}</Text>
               </Pressable>
             </View>
           </View>
@@ -460,4 +460,19 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: Typography.lg, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md },
   modalBtns: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.lg },
   modalBtn: { flex: 1 },
+  modalDangerBtn: {
+    minHeight: 56,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+  },
+  modalDangerBtnText: {
+    fontSize: Typography.sm,
+    fontWeight: '600',
+    color: Colors.textInverse,
+    textAlign: 'center',
+  },
 });
