@@ -58,6 +58,25 @@ export async function getMyAvatarSignedUrl(): Promise<{ url: string | null }> {
   return res.data as { url: string | null };
 }
 
+export type AvatarImageSource = {
+  uri: string;
+  headers?: { Authorization: string };
+};
+
+/** Profile avatar via API proxy (MinIO :9000 is not reachable from mobile on VPS). */
+export function myAvatarImageSource(
+  accessToken: string | null | undefined,
+  hasAvatar: boolean,
+): AvatarImageSource | null {
+  if (!hasAvatar || !accessToken) return null;
+  const origin = String(SHARED_API_URL || '').replace(/\/+$/, '');
+  if (!origin) return null;
+  return {
+    uri: `${origin}/auth/me/avatar-file`,
+    headers: { Authorization: `Bearer ${accessToken}` },
+  };
+}
+
 export async function uploadMyAvatar(params: {
   uri: string;
   fileName: string;

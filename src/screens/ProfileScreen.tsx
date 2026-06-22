@@ -9,7 +9,7 @@ import { useTabScreenBottomPadding } from '@/hooks/useTabScreenBottomPadding';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
-import { getMyAvatarSignedUrl, me, updateMe, uploadMyAvatar, type UpdateMeInput } from '@/api/auth';
+import { myAvatarImageSource, me, updateMe, uploadMyAvatar, type UpdateMeInput } from '@/api/auth';
 import { getMyWallet, getNotifications, markLoyaltyWelcomeShown } from '@/api/wallet';
 import { clearPersistedSession } from '@/auth/session';
 import { FullscreenImageModal } from '@/components/FullscreenImageModal';
@@ -17,7 +17,6 @@ import type { RootStackParamList } from '@/navigation/types';
 import { t } from '@/i18n';
 import { useAuthStore } from '@/store/authStore';
 import { getErrorMessage } from '@/utils/errors';
-import { resolveFileUrl } from '@/utils/files';
 import { getLoyaltyTierTheme } from '@/utils/loyalty-tier-theme';
 import { Colors, Radius, Spacing, Styles, Typography } from '@/utils/theme';
 
@@ -78,6 +77,7 @@ export function ProfileScreen() {
   const logout = useAuthStore((s) => s.logout);
   const sessionUser = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
+  const accessToken = useAuthStore((s) => s.accessToken);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [editVisible, setEditVisible] = useState(false);
   const [avatarFullscreenVisible, setAvatarFullscreenVisible] = useState(false);
@@ -98,7 +98,6 @@ export function ProfileScreen() {
   const [gender, setGender] = useState<'MALE' | 'FEMALE' | ''>('');
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
-  const [avatarSignedUrl, setAvatarSignedUrl] = useState<string | null>(null);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [avatarChanged, setAvatarChanged] = useState(false);
   const [welcomeVisible, setWelcomeVisible] = useState(false);
@@ -142,28 +141,13 @@ export function ProfileScreen() {
   }, [user?.id]);
 
   useEffect(() => {
-    let cancelled = false;
     setAvatarLoadFailed(false);
-    setAvatarSignedUrl(null);
+  }, [user?.avatar, accessToken]);
 
-    if (!user?.avatar) return;
-
-    (async () => {
-      try {
-        const res = await getMyAvatarSignedUrl();
-        if (cancelled) return;
-        setAvatarSignedUrl(res.url);
-      } catch {
-        // Fallback handled via resolveFileUrl / raw avatar value
-        if (cancelled) return;
-        setAvatarSignedUrl(null);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.avatar]);
+  const avatarSource = useMemo(
+    () => myAvatarImageSource(accessToken, Boolean(user?.avatar)),
+    [accessToken, user?.avatar],
+  );
 
   const updateMutation = useMutation({
     mutationFn: (input: UpdateMeInput) => updateMe(input),
@@ -235,13 +219,6 @@ export function ProfileScreen() {
     // Avatar upload already updates profile on backend.
     setAvatarChanged(false);
     setEditVisible(false);
-  }
-
-  function getAvatarUri() {
-    const raw = user?.avatar ? String(user.avatar) : '';
-    const candidate = avatarSignedUrl ?? resolveFileUrl(raw) ?? raw;
-    if (!/^https?:\/\//i.test(candidate)) return null;
-    return candidate;
   }
 
   async function pickAndUploadAvatar() {
@@ -344,27 +321,17 @@ export function ProfileScreen() {
         ]}
       >
         <Pressable
-          disabled={!user?.avatar}
+          disabled={!avatarSource}
           onPress={() => setAvatarFullscreenVisible(true)}
-          style={({ pressed }) => [styles.avatarPressable, pressed && !!user?.avatar && styles.pressed]}
+          style={({ pressed }) => [styles.avatarPressable, pressed && !!avatarSource && styles.pressed]}
         >
-          {user?.avatar && getAvatarUri() ? (
-            avatarLoadFailed ? (
-              <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarPlaceholderText}>
-                  {String(user?.firstName?.[0] ?? 'U').toUpperCase()}
-                </Text>
-              </View>
-            ) : (
+          {avatarSource && !avatarLoadFailed ? (
               <Image
-                source={{
-                  uri: getAvatarUri() as string,
-                }}
+                source={avatarSource}
                 style={styles.avatarImg}
                 onError={() => setAvatarLoadFailed(true)}
               />
-            )
-          ) : (
+            ) : (
             <View style={styles.avatarPlaceholder}>
               <Text style={styles.avatarPlaceholderText}>
                 {String(user?.firstName?.[0] ?? 'U').toUpperCase()}
@@ -518,10 +485,10 @@ export function ProfileScreen() {
         </View>
       </Modal>
 
-      {user?.avatar ? (
+      {avatarSource ? (
         <FullscreenImageModal
           visible={avatarFullscreenVisible}
-          uri={getAvatarUri() ?? ''}
+          source={avatarSource}
           onClose={() => setAvatarFullscreenVisible(false)}
         />
       ) : null}

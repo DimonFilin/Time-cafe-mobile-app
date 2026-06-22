@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Animated, Image, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Image, ImageSourcePropType, Modal, Pressable, StyleSheet, View } from 'react-native';
 
 type Props = {
   visible: boolean;
-  uri: string;
+  source: ImageSourcePropType;
   onClose: () => void;
 };
 
-export function FullscreenImageModal({ visible, uri, onClose }: Props) {
+export function FullscreenImageModal({ visible, source, onClose }: Props) {
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -31,7 +31,7 @@ export function FullscreenImageModal({ visible, uri, onClose }: Props) {
       <Pressable style={styles.overlay} onPress={onClose}>
         <Animated.View style={[styles.content, contentStyle]} onStartShouldSetResponder={() => true}>
           <View style={styles.imageWrap}>
-            <Image source={{ uri }} style={styles.image} resizeMode="contain" />
+            <Image source={source} style={styles.image} resizeMode="contain" />
           </View>
         </Animated.View>
       </Pressable>
@@ -64,4 +64,3 @@ const styles = StyleSheet.create({
     height: '100%',
   },
 });
-
