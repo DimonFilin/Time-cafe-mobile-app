@@ -13,7 +13,7 @@ export type Appointment = {
   status: AppointmentStatus;
   qrCode?: string;
   totalAmount?: string;
-  paymentMethod?: 'CARD' | 'BALANCE' | 'CASH' | 'FREE';
+  paymentMethod?: 'CARD' | 'BALANCE' | 'CASH';
   notes?: string;
   roomSnapshot?: Record<string, unknown>;
   selectedAssets?: Record<string, unknown>;
@@ -59,7 +59,7 @@ export async function createAppointment(input: {
   dateTime: string;
   duration: number;
   billingMode?: 'HOURLY' | 'MINUTE';
-  paymentMethod?: 'CARD' | 'BALANCE' | 'CASH' | 'FREE';
+  paymentMethod?: 'CARD' | 'BALANCE' | 'CASH';
   cardId?: string;
   notes?: string;
   selectedSharedAssetIds?: string[];

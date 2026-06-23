@@ -51,7 +51,7 @@ export function BookingCreateScreen({ navigation, route }: Props) {
   const [time, setTime] = useState(defaultTime);
   const [durationPreset, setDurationPreset] = useState(60);
   const [durationCustom, setDurationCustom] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'FREE' | 'CARD' | 'CASH'>('FREE');
+  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'CASH'>('CASH');
   const [billingMode, setBillingMode] = useState<RoomBillingMode>('HOURLY');
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
@@ -190,12 +190,14 @@ export function BookingCreateScreen({ navigation, route }: Props) {
     return calculateRoomBookingPrice(durationNumber, billingMode, roomBilling);
   }, [durationValid, durationNumber, billingMode, roomBilling, availableBillingModes]);
   const cardValid = paymentMethod !== 'CARD' || !!selectedCardId;
-  const paymentValid = totalPrice <= 0 || paymentMethod !== 'CARD' || !!selectedCardId;
+  const paymentValid =
+    totalPrice > 0 && (paymentMethod !== 'CARD' || !!selectedCardId);
   const canSubmit =
     !mutation.isPending &&
     durationValid &&
     dateTimeValid &&
     paymentValid &&
+    totalPrice > 0 &&
     !!selectedRoomId &&
     slotFree &&
     availableBillingModes.length > 0;
@@ -208,7 +210,7 @@ export function BookingCreateScreen({ navigation, route }: Props) {
       dateTime: dateTimeIso,
       duration: durationNumber,
       billingMode,
-      paymentMethod: totalPrice > 0 ? paymentMethod : 'FREE',
+      paymentMethod,
       cardId: paymentMethod === 'CARD' ? selectedCardId ?? undefined : undefined,
       notes: notes.trim() || undefined,
       selectedSharedAssetIds,
@@ -431,7 +433,7 @@ export function BookingCreateScreen({ navigation, route }: Props) {
       <View style={styles.section}>
         <SectionLabel>{t('appointments.createPaymentMethod')}</SectionLabel>
         <View style={styles.chipsRow}>
-          {(['FREE', 'CARD', 'CASH'] as const).map((pm) => {
+          {(['CARD', 'CASH'] as const).map((pm) => {
             const active = paymentMethod === pm;
             return (
               <Pressable
@@ -489,6 +491,12 @@ export function BookingCreateScreen({ navigation, route }: Props) {
           numberOfLines={3}
         />
       </View>
+
+      {selectedRoomId && totalPrice <= 0 ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>Бронирование недоступно: для комнаты не задан тариф.</Text>
+        </View>
+      ) : null}
 
       {mutation.error ? (
         <View style={styles.errorBox}>
