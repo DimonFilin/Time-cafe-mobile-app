@@ -1,12 +1,12 @@
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { Ionicons } from '@expo/vector-icons';
 
 import { cancelAppointment, getAppointmentById } from '@/api/appointments';
-import { getMyOrders } from '@/api/orders';
+import { getMyOrders, type OrderResponse } from '@/api/orders';
 import { getOrderChatByOrder } from '@/api/order-chat';
 import { FullscreenQrModal } from '@/components/FullscreenQrModal';
 import { MoneyAmount } from '@/components/currency/MoneyAmount';
@@ -34,6 +34,11 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
   PENDING: 'Ожидает', CONFIRMED: 'Подтверждён', COMPLETED: 'Завершён', CANCELLED: 'Отменён',
 };
 
+function formatOrderItemsSummary(order: OrderResponse): string {
+  if (!order.items?.length) return `Заказ #${order.orderNumber}`;
+  return order.items.map((item) => `${item.itemName} ×${item.quantity}`).join(', ');
+}
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={infoStyles.row}>
@@ -53,6 +58,7 @@ export function BookingDetailsScreen({ route, navigation }: Props) {
   const queryClient = useQueryClient();
   const viewer = useAuthStore((s) => s.user);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<OrderResponse | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [qrVisible, setQrVisible] = useState(false);
   const [chatEnabled, setChatEnabled] = useState(true);
@@ -126,8 +132,22 @@ export function BookingDetailsScreen({ route, navigation }: Props) {
 
   const statusStyle = getStatusStyle(booking.status);
 
+  const refreshDetails = () => {
+    void bookingQuery.refetch();
+    void ordersQuery.refetch();
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={bookingQuery.isFetching || ordersQuery.isFetching}
+          onRefresh={refreshDetails}
+        />
+      }
+    >
 
       {/* ── Status hero card ── */}
       <View style={[styles.heroCard, { borderLeftColor: statusStyle.text }]}>
@@ -170,9 +190,6 @@ export function BookingDetailsScreen({ route, navigation }: Props) {
       >
         <View style={styles.qrInner}>
           <QRCode value={qrValue || ' '} size={130} />
-          <View pointerEvents="none" style={styles.qrBadge}>
-            <Image source={require('../../assets/favicon.png')} style={styles.qrLogo} />
-          </View>
         </View>
         <View style={styles.qrHint}>
           <Ionicons name="expand-outline" size={14} color={Colors.textMuted} />
@@ -235,7 +252,7 @@ export function BookingDetailsScreen({ route, navigation }: Props) {
           {orders.map((o, i) => (
             <Pressable
               key={o.id}
-              onPress={() => navigation.navigate('OrderChat', { orderId: o.id, cafeName: booking.cafeName ?? undefined })}
+              onPress={() => setSelectedOrder(o)}
               style={({ pressed }) => [
                 styles.orderRow,
                 i === orders.length - 1 && styles.orderRowLast,
@@ -243,8 +260,12 @@ export function BookingDetailsScreen({ route, navigation }: Props) {
               ]}
             >
               <View style={styles.orderLeft}>
-                <Text style={styles.orderNumber}>#{o.orderNumber}</Text>
-                <Text style={styles.orderStatus}>{ORDER_STATUS_LABELS[o.status] ?? o.status}</Text>
+                <Text style={styles.orderItemsSummary} numberOfLines={2}>
+                  {formatOrderItemsSummary(o)}
+                </Text>
+                <Text style={styles.orderMeta}>
+                  #{o.orderNumber} · {ORDER_STATUS_LABELS[o.status] ?? o.status}
+                </Text>
               </View>
               <MoneyAmount value={o.totalAmount} textStyle={styles.orderTotal} iconSize={13} />
               <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} />
@@ -306,6 +327,70 @@ export function BookingDetailsScreen({ route, navigation }: Props) {
         </View>
       </Modal>
 
+      <Modal
+        visible={Boolean(selectedOrder)}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setSelectedOrder(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            {selectedOrder ? (
+              <>
+                <Text style={styles.modalTitle}>
+                  Заказ #{selectedOrder.orderNumber}
+                </Text>
+                <Text style={styles.orderModalStatus}>
+                  {ORDER_STATUS_LABELS[selectedOrder.status] ?? selectedOrder.status}
+                </Text>
+                <View style={styles.orderModalItems}>
+                  {selectedOrder.items.map((item) => (
+                    <View key={item.id} style={styles.orderModalItem}>
+                      <View style={styles.orderModalItemTop}>
+                        <Text style={styles.orderModalItemName}>
+                          {item.itemName} ×{item.quantity}
+                        </Text>
+                        <MoneyAmount value={item.totalPrice} textStyle={styles.orderModalItemPrice} iconSize={12} />
+                      </View>
+                      {item.notes ? (
+                        <Text style={styles.orderModalItemNotes}>{item.notes}</Text>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+                <View style={styles.orderModalTotalRow}>
+                  <Text style={styles.orderModalTotalLabel}>Итого</Text>
+                  <MoneyAmount value={selectedOrder.totalAmount} textStyle={styles.orderModalTotalValue} iconSize={14} />
+                </View>
+                <View style={styles.modalBtns}>
+                  <Pressable
+                    onPress={() => setSelectedOrder(null)}
+                    style={({ pressed }) => [Styles.secondaryBtn, styles.modalBtn, pressed && Styles.pressed]}
+                  >
+                    <Text style={Styles.secondaryBtnText}>{t('appointments.close')}</Text>
+                  </Pressable>
+                  {chatEnabled && !chatCheckLoading ? (
+                    <Pressable
+                      onPress={() => {
+                        const orderId = selectedOrder.id;
+                        setSelectedOrder(null);
+                        navigation.navigate('OrderChat', {
+                          orderId,
+                          cafeName: booking?.cafeName ?? undefined,
+                        });
+                      }}
+                      style={({ pressed }) => [styles.chatBtn, styles.modalBtn, pressed && Styles.pressed]}
+                    >
+                      <Text style={styles.chatBtnText}>{t('chat.contactStaff')}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
       <FullscreenQrModal
         visible={qrVisible}
         title={booking.cafeName ?? t('appointments.detailsTitle')}
@@ -363,15 +448,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
   qrInner: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center' },
-  qrBadge: {
-    position: 'absolute',
-    width: 32, height: 32,
-    borderRadius: Radius.sm,
-    backgroundColor: Colors.white,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  qrLogo: { width: 22, height: 22, borderRadius: 6 },
   qrHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: Spacing.md },
   qrHintText: { fontSize: Typography.sm, color: Colors.textMuted },
 
@@ -420,9 +496,34 @@ const styles = StyleSheet.create({
   },
   orderRowLast: { borderBottomWidth: 0 },
   orderLeft: { flex: 1 },
+  orderItemsSummary: { fontSize: Typography.sm, fontWeight: '600', color: Colors.textPrimary },
+  orderMeta: { fontSize: Typography.xs, color: Colors.textMuted, marginTop: 2 },
   orderNumber: { fontSize: Typography.base, fontWeight: '700', color: Colors.textPrimary },
   orderStatus: { fontSize: Typography.sm, color: Colors.textMuted },
   orderTotal: { fontSize: Typography.base, fontWeight: '600', color: Colors.coffeeDark },
+  orderModalStatus: { fontSize: Typography.sm, color: Colors.textMuted, marginBottom: Spacing.sm },
+  orderModalItems: { gap: Spacing.sm, marginBottom: Spacing.md },
+  orderModalItem: {
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    borderRadius: Radius.md,
+    padding: Spacing.sm,
+  },
+  orderModalItemTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: Spacing.sm },
+  orderModalItemName: { flex: 1, fontSize: Typography.sm, fontWeight: '600', color: Colors.textPrimary },
+  orderModalItemPrice: { fontSize: Typography.sm, fontWeight: '600', color: Colors.coffeeDark },
+  orderModalItemNotes: { fontSize: Typography.xs, color: Colors.textMuted, marginTop: 4 },
+  orderModalTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: Spacing.sm,
+    marginBottom: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+  },
+  orderModalTotalLabel: { fontSize: Typography.base, fontWeight: '700', color: Colors.textPrimary },
+  orderModalTotalValue: { fontSize: Typography.base, fontWeight: '700', color: Colors.coffeeDark },
 
   // Danger
   dangerBtn: {

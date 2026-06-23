@@ -198,7 +198,7 @@ export function BookingsScreen({ navigation }: Props) {
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>📅</Text>
               <Text style={styles.emptyTitle}>{t('appointments.empty')}</Text>
-              <Text style={styles.emptySubtitle}>{t('appointments.emptyHint') ?? 'Забронируйте столик в кафе'}</Text>
+              <Text style={styles.emptySubtitle}>{t('appointments.emptyHint')}</Text>
             </View>
           ) : null
         }

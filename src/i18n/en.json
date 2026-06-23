@@ -108,6 +108,8 @@
     "detailsTitle": "Booking",
     "loading": "Loading bookings...",
     "empty": "No bookings",
+    "emptyHint": "No bookings yet. You can create one in the Cafes tab.",
+    "filtersActive": "Filters active",
     "filtersTitle": "Filters",
     "status": "Status",
     "from": "From (ISO)",
